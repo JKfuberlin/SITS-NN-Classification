@@ -158,11 +158,53 @@ def get_date(img):
     img = img.set('date', date)
     return img
 
-feature = ee.Feature(fc.toList(fc.size()).get(1)) # first feature as example: get(0); toList(235) is max number of features for FVA dataset
 
-s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-print(s2.first().getInfo())
-
+for i in range(0, fc.size().getInfo()):
+    feature = ee.Feature(fc.toList(fc.size()).get(i))
+    s2 = ee.ImageCollection('COPERNICUS/S2_SR')
+    # print(s2.first().getInfo())
+    startDate = '2015-07-01'
+    endDate = '2022-10-30'
+    s2_sr_cld_col_eval, s2_sr_col = get_s2_sr_cld_col(feature.geometry(), startDate, endDate)
+    # print(s2_sr_cld_col_eval.first().getInfo())
+    # print(s2_sr_col.first().getInfo())
+    s2_sr_cld_col_eval = s2_sr_cld_col_eval.map(get_date)
+    # dates = s2_sr_cld_col_eval.aggregate_array('date')
+    # print(s2_sr_cld_col_eval.first().getInfo())
+    s2_sr_cld_col_eval_disp = s2_sr_cld_col_eval.map(add_cld_shdw_mask)
+    # print(s2_sr_cld_col_eval_disp.first().getInfo())
+    # Mask out cloudy pixels in original image
+    s2 = s2_sr_cld_col_eval_disp.map(maskClouds_s2)
+    # print(s2.first().getInfo())
+    s2 = s2.map(renameS2)
+    s2 = s2.map(lambda image: image.set({"spacecraft_id": image.get("SPACECRAFT_NAME")}))
+    # print(s2.first().getInfo())
+    ## combined collection of all Landsat images
+    # s2 = ee.ImageCollection('COPERNICUS/S2_SR')
+    # s2 = ee.ImageCollection('COPERNICUS/S2_SR').map(prepS2)
+    # s2 = ee.ImageCollection('COPERNICUS/S2_SR')
+    # print(s2.first().getInfo())
+    data = s2.map(lambda image:
+                  image.reduceRegions(
+                      collection=feature,
+                      reducer=ee.Reducer.mean(),
+                      # crs='EPSG:5070',
+                      scale=30
+                  )
+                  .map(lambda feat:
+                       feat.copyProperties(image, image.propertyNames()))).flatten()
+    plotnumber = feature.get('plotID').getInfo()  # FVA data: 'plot'
+    datestring = feature.get('date').getInfo()
+    datestring = datestring.replace('-', '_')
+    ### export
+    ee.batch.Export.table.toDrive(
+        collection=data,
+        folder='extract',
+        description=os.path.join('senf_timeseries_plot_' + str(plotnumber) + '_date_' + str(datestring)),
+        selectors=['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'date', 'spacecraft_id', 'mort_0', 'mort_1',
+                   'mort_2', 'mort_3', 'mort_4', 'mort_5', 'mort_7', 'mort_8', 'mort_9', 'plot', 'area_ha', 'abswood',
+                   'lostwoodpc', '.geo'],
+        fileFormat='CSV').start()
 
 ######################################################
 ####### workflow: get landsat time series data #######
@@ -177,46 +219,7 @@ print(s2.first().getInfo())
 # print(ee.Date(endDate).advance(-207, 'weeks').getInfo()) # startDate
 # print(startDate.getInfo())
 
-startDate = '2015-07-01'
-endDate = '2022-10-30'
-s2_sr_cld_col_eval, s2_sr_col = get_s2_sr_cld_col(feature.geometry(), startDate, endDate)
-# print(s2_sr_cld_col_eval.first().getInfo())
-# print(s2_sr_col.first().getInfo())
 
-
-
-s2_sr_cld_col_eval = s2_sr_cld_col_eval.map(get_date)
-# dates = s2_sr_cld_col_eval.aggregate_array('date')
-# print(s2_sr_cld_col_eval.first().getInfo())
-
-s2_sr_cld_col_eval_disp = s2_sr_cld_col_eval.map(add_cld_shdw_mask)
-# print(s2_sr_cld_col_eval_disp.first().getInfo())
-
-# Mask out cloudy pixels in original image
-s2 = s2_sr_cld_col_eval_disp.map(maskClouds_s2)
-# print(s2.first().getInfo())
-s2 = s2.map(renameS2)
-s2 = s2.map(lambda image: image.set({"spacecraft_id": image.get("SPACECRAFT_NAME")}))
-# print(s2.first().getInfo())
-
-## combined collection of all Landsat images
-# s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-
-# s2 = ee.ImageCollection('COPERNICUS/S2_SR').map(prepS2)
-
-# s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-# print(s2.first().getInfo())
-
-
-data = s2.map(lambda image:
-                       image.reduceRegions(
-                           collection = feature,
-                           reducer=ee.Reducer.mean(),
-                           # crs='EPSG:5070',
-                           scale=30
-                       )
-                  .map(lambda feat:
-                       feat.copyProperties(image, image.propertyNames()))).flatten()
 
 
 # print(data.first().propertyNames().getInfo())
