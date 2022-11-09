@@ -1,64 +1,21 @@
 # imports
 import ee
 import os
-import time
 
 # Authent and Initialize
-print('aeo')
 ee.Authenticate()
-print('aeo')
 ee.Initialize()
 
-CLOUD_FILTER = 90
+# explanation for settings:
+# https://developers.google.com/earth-engine/tutorials/community/sentinel-2-s2cloudless
+CLOUD_FILTER = 10
 CLD_PRB_THRESH = 40
 NIR_DRK_THRESH = 0.2
 CLD_PRJ_DIST = 1.2
-BUFFER = 20
+BUFFER = 50
 
 # load shape
 fc = ee.FeatureCollection('users/jk90fub/somepoints')
-
-def getQABits(image, start, end, newName):
-      # Compute the bits we need to extract.
-     pattern = 0
-     for i in range(start, end + 1):
-          pattern += 2 ** i
-    # Return a single band image of the extracted QA bits, giving the band a new name.
-     return image.select([0], [newName]).bitwiseAnd(pattern).rightShift(start)
-
-    ## a method to mask out cloud shadows
-def cloud_shadows(image):
-   ## Select the QA band.
-     QA = image.select(['pixel_qa'])
-    ## Get the internal_cloud_algorithm_flag bit.
-     return getQABits(QA, 3, 3, 'Cloud_shadows').eq(0)
-     ## Return an image masking out cloudy areas.
-
-## a method to mask out clouds
-def clouds(image):
-    ## Select the QA band.
-    QA = image.select(['pixel_qa'])
-    ## Get the internal_cloud_algorithm_flag bit.
-    return getQABits(QA, 5, 5, 'Cloud').eq(0)
-    ## Return an image masking out cloudy areas.
-    ## a method to mask out snow
-
-def snow(image):
-   ## Select the QA band
-   QA = image.select(['pixel_qa'])
-   ## Get the internal_cloud_algorithm_flag bit.
-   return getQABits(QA, 4, 4, 'Snow').eq(0)
-   ## Return an image masking out cloudy areas.
-   ## combined method that masks out snow, cloud_shadows and clouds
-
-def maskClouds(image):
-   s = snow(image)
-   cs = cloud_shadows(image)
-   c = clouds(image)
-   image = image.updateMask(s)
-   image = image.updateMask(cs)
-   return image.updateMask(c)
-
 
 ### cloud masking part for Sentinel-2 (all adapted from Pia Labenski; be aware that this code is NOT PUBLIC
 ### (although mainly adpoted from GEE tutorial) -> do not share)
@@ -69,12 +26,10 @@ def get_s2_sr_cld_col(aoi, start_date, end_date):  # aoi, start_date, end_date
                  .filterBounds(aoi)
                  .filterDate(start_date, end_date)
                  .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', CLOUD_FILTER)))
-    print('jusquici')
     # Import and filter s2cloudless.
     s2_cloudless_col = (ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
                         .filterBounds(aoi)
                         .filterDate(start_date, end_date))
-    print('toutvabien')
     # Join the filtered s2cloudless collection to the SR collection by the 'system:index' property.
     return ee.ImageCollection(ee.Join.saveFirst('s2cloudless').apply(**{
         'primary': s2_sr_col,
@@ -134,56 +89,27 @@ def add_cld_shdw_mask(img):
 def maskClouds_s2(img):
     return img.updateMask(img.select('cloudmask').eq(0))
 
-
-def renameS2(img):
-    return img.select(['B2', 'B3', 'B4', 'B8', 'B11', 'B12'], ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2'])
-
-
-def prepS2(img):
-    img = add_cld_shdw_mask(img)
-    img = maskClouds_s2(img).unmask(-9999)
-    img = renameS2(img)
-    return img
-
-
-def prepS2(img):
-    img = add_cld_shdw_mask(img)
-    img = maskClouds_s2(img).unmask(-9999)
-    img = renameS2(img)
-    return img
-
-
 def get_date(img):
     date = ee.Date(img.get('system:time_start')).format('YYYYMMdd')
     img = img.set('date', date)
     return img
 
+# add delay to for-loop:
+DELAY = True
+STEPS = 1500
+DELAYTIME = 20000 # e.g. 32,400 seconds == 9 hours
 
+# for i in range(0, fc.size().getInfo()):
 for i in range(0, fc.size().getInfo()):
     feature = ee.Feature(fc.toList(fc.size()).get(i))
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-    # print(s2.first().getInfo())
-    startDate = '2015-07-01'
+    startDate = '2015-10-01'
     endDate = '2022-10-30'
     s2_sr_cld_col_eval, s2_sr_col = get_s2_sr_cld_col(feature.geometry(), startDate, endDate)
-    # print(s2_sr_cld_col_eval.first().getInfo())
-    # print(s2_sr_col.first().getInfo())
     s2_sr_cld_col_eval = s2_sr_cld_col_eval.map(get_date)
-    # dates = s2_sr_cld_col_eval.aggregate_array('date')
-    # print(s2_sr_cld_col_eval.first().getInfo())
     s2_sr_cld_col_eval_disp = s2_sr_cld_col_eval.map(add_cld_shdw_mask)
-    # print(s2_sr_cld_col_eval_disp.first().getInfo())
-    # Mask out cloudy pixels in original image
     s2 = s2_sr_cld_col_eval_disp.map(maskClouds_s2)
-    # print(s2.first().getInfo())
-    s2 = s2.map(renameS2)
     s2 = s2.map(lambda image: image.set({"spacecraft_id": image.get("SPACECRAFT_NAME")}))
-    # print(s2.first().getInfo())
-    ## combined collection of all Landsat images
-    # s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-    # s2 = ee.ImageCollection('COPERNICUS/S2_SR').map(prepS2)
-    # s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-    # print(s2.first().getInfo())
     data = s2.map(lambda image:
                   image.reduceRegions(
                       collection=feature,
@@ -193,49 +119,14 @@ for i in range(0, fc.size().getInfo()):
                   )
                   .map(lambda feat:
                        feat.copyProperties(image, image.propertyNames()))).flatten()
-    plotnumber = feature.get('plotID').getInfo()  # FVA data: 'plot'
-    datestring = feature.get('date').getInfo()
-    datestring = datestring.replace('-', '_')
-    ### export
+    print('saving')
     ee.batch.Export.table.toDrive(
         collection=data,
         folder='extract',
-        description=os.path.join('senf_timeseries_plot_' + str(plotnumber) + '_date_' + str(datestring)),
-        selectors=['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'date', 'spacecraft_id', 'mort_0', 'mort_1',
-                   'mort_2', 'mort_3', 'mort_4', 'mort_5', 'mort_7', 'mort_8', 'mort_9', 'plot', 'area_ha', 'abswood',
-                   'lostwoodpc', '.geo'],
+        description=os.path.join('plot_' + str(i)),
+        selectors=['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12', 'date', 'spacecraft_id','id'],
         fileFormat='CSV').start()
-
-######################################################
-####### workflow: get landsat time series data #######
-######################################################
-
-## set startDate and endDate for the feature
-# print(feature.get('date').getInfo())
-# endDate = ee.Date(fc.get('date')).format('YYYY-MM-dd')
-# print(endDate.getInfo())
-# print(endDate.format('YYYY-MM-dd').getInfo())
-# startDate = ee.Date(ee.Date(feature.get('date')).advance(-6, 'years')) # .format('YYYY-MM-dd') # 208 weeks earlier
-# print(ee.Date(endDate).advance(-207, 'weeks').getInfo()) # startDate
-# print(startDate.getInfo())
-
-
-
-
-# print(data.first().propertyNames().getInfo())
-# print(data.size().getInfo())
-
-### prepare the export
-plotnumber = feature.get('plotID').getInfo() # FVA data: 'plot'
-datestring = feature.get('date').getInfo()
-datestring = datestring.replace('-', '_')
-
-### export
-ee.batch.Export.table.toDrive(
-    collection=data,
-    folder='senf_tree_health_poly_plot_area_all_data',
-    description=os.path.join('senf_timeseries_plot_' + str(plotnumber) + '_date_' + str(datestring)),
-    selectors=['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'date', 'spacecraft_id', 'mort_0', 'mort_1',
-               'mort_2', 'mort_3', 'mort_4', 'mort_5', 'mort_7', 'mort_8', 'mort_9', 'plot', 'area_ha', 'abswood', 'lostwoodpc', '.geo'],
-    fileFormat='CSV').start()
-
+    # GEE can only handle 3000 tasks at once -> add sleep time to avoid overflow
+    if DELAY:
+        if (int(i) % int(STEPS)) == 0: # every STEPS steps of for-loop
+            time.sleep(DELAYTIME)
