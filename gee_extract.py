@@ -101,14 +101,14 @@ DELAY = True
 STEPS = 1500
 DELAYTIME = 20000 # e.g. 32,400 seconds == 9 hours
 
-for i in range(0, 10):
+for i in range(0, 3):
 # for i in range(0, fc.size().getInfo()):
     n = random.randint(1, fc.size().getInfo())
     feature = ee.Feature(fc.toList(fc.size()).get(n))
     # feature = ee.Feature(fc.toList(fc.size()).get(i))
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-    startDate = '2015-01-01'
-    endDate = '2018-12-31'
+    startDate = '2022-01-01'
+    endDate = '2022-10-31'
     s2_sr_cld_col_eval, s2_sr_col = get_s2_sr_cld_col(feature.geometry(), startDate, endDate)
     s2_sr_cld_col_eval = s2_sr_cld_col_eval.map(get_date)
     s2_sr_cld_col_eval_disp = s2_sr_cld_col_eval.map(add_cld_shdw_mask)
@@ -130,6 +130,7 @@ for i in range(0, 10):
         description=os.path.join('plot_' + str(i)),
         selectors=['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12', 'date', 'spacecraft_id','id'],
         fileFormat='CSV').start()
+    print("Submit all tasks to Google Earth Engine")
     # GEE can only handle 3000 tasks at once -> add sleep time to avoid overflow
     # if DELAY:
     #     if (int(i) % int(STEPS)) == 0: # every STEPS steps of for-loop
