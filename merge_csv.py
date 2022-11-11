@@ -15,18 +15,34 @@ def merge_csv_files(filename:str):
     for file in files:
         if file.endswith(".csv"):
             dir = os.path.join(input_dir, file)
-            df = pd.read_csv(dir, sep=',', header=0, index_col=False)
+            df = pd.read_csv(dir, sep=',', header=0, index_col=False, parse_dates = ['date'])
+            # TODO: chooes same time series for each polygon
+            df = reshape(df)
             input.append(df)
-    # merge all input data frames           
-    output = pd.concat(input)
-    output_path = os.path.join(output_dir, filename)
-    output.to_csv(output_path, index=False)
-    print("merged successfully")
+            # export each new csv file
+            output_path = os.path.join(output_dir, file)
+            df.to_csv(output_path, index=False)
+            print(f"Exported reshaped {file} to {output_dir}")
+    # # merge all input data frames(runable)          
+    # output = pd.concat(input)
+    # output_path = os.path.join(output_dir, filename)
+    # output.to_csv(output_path, index=False)
+    # print("merged successfully")
 
 
-# turn combination of reflectance value and date into a seperate column
+def reshape(df:pd.DataFrame) -> pd.DataFrame:
+    # turn combination of reflectance value and date into a seperate column
+    # new keys and values
+    keys = list(df.keys())
+    data = {'id':df.at[0, 'id']}
+    for index, row in df.iterrows():
+        date = row['date'].strftime('%Y%m%d')
+        for key in keys[:-3]:
+            column = f'{date} {key}'
+            data[column] = [row[key]]
+    # reshape data
+    return pd.DataFrame(data)
 
-# merge them
 
 
 
