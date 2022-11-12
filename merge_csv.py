@@ -6,7 +6,7 @@ input_dir = os.path.join(PATH, 'extract')
 output_dir = os.path.join(PATH, 'output')
 
 
-def merge_csv_files(filename:str):
+def merge_csv_files(filename:str) -> None:
     # load all csv from folder
     # and turn into list of data frames
     input = []
@@ -14,20 +14,23 @@ def merge_csv_files(filename:str):
     files = os.listdir(input_dir)
     for file in files:
         if file.endswith(".csv"):
-            dir = os.path.join(input_dir, file)
-            df = pd.read_csv(dir, sep=',', header=0, index_col=False, parse_dates = ['date'])
+            in_path = os.path.join(input_dir, file)
+            df = pd.read_csv(in_path, sep=',', header=0, index_col=False, parse_dates = ['date'])
+            print(f'import file {in_path}')
+            # delete date when no available data
+            df = df.dropna(axis=0, how='any')
             # TODO: chooes same time series for each polygon
             df = reshape(df)
             input.append(df)
             # export each new csv file
-            output_path = os.path.join(output_dir, file)
-            df.to_csv(output_path, index=False)
-            print(f"Exported reshaped {file} to {output_dir}")
-    # # merge all input data frames(runable)          
-    # output = pd.concat(input)
-    # output_path = os.path.join(output_dir, filename)
-    # output.to_csv(output_path, index=False)
-    # print("merged successfully")
+            tmp_path = os.path.join(output_dir, file)
+            df.to_csv(tmp_path, index=False)
+            print(f"export reshaped file {tmp_path}")
+    # merge all input data frames(runable)          
+    output = pd.concat(input)
+    out_path = os.path.join(output_dir, filename)
+    output.to_csv(out_path, index=False)
+    print(f"export merged file {out_path}")
 
 
 def reshape(df:pd.DataFrame) -> pd.DataFrame:

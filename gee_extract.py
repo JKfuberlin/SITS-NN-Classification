@@ -2,7 +2,6 @@
 import ee
 import os
 import time
-import random
 
 # Authent and Initialize
 ee.Authenticate()
@@ -17,7 +16,7 @@ CLD_PRJ_DIST = 1.2
 BUFFER = 50
 
 # load shape
-fc = ee.FeatureCollection('users/dongshew96/buffered_inpolysites')
+fc = ee.FeatureCollection('users/dongshew96/buffered_wgs_inpolysites')
 
 ### cloud masking part for Sentinel-2 (all adapted from Pia Labenski; be aware that this code is NOT PUBLIC
 ### (although mainly adpoted from GEE tutorial) -> do not share)
@@ -97,17 +96,15 @@ def get_date(img):
     return img
 
 # add delay to for-loop:
-DELAY = True
-STEPS = 1500
+DELAY = False
+STEPS = 3000
 DELAYTIME = 20000 # e.g. 32,400 seconds == 9 hours
 
-for i in range(0, 3):
+for i in range(6000, 9000):
 # for i in range(0, fc.size().getInfo()):
-    n = random.randint(1, fc.size().getInfo())
-    feature = ee.Feature(fc.toList(fc.size()).get(n))
-    # feature = ee.Feature(fc.toList(fc.size()).get(i))
+    feature = ee.Feature(fc.toList(fc.size()).get(i))
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-    startDate = '2022-01-01'
+    startDate = '2017-01-01'
     endDate = '2022-10-31'
     s2_sr_cld_col_eval, s2_sr_col = get_s2_sr_cld_col(feature.geometry(), startDate, endDate)
     s2_sr_cld_col_eval = s2_sr_cld_col_eval.map(get_date)
@@ -123,15 +120,15 @@ for i in range(0, 3):
                   )
                   .map(lambda feat:
                        feat.copyProperties(image, image.propertyNames()))).flatten()
-    print(f'saving polygon {n}')
+    print(f'saving polygon {i}')
     ee.batch.Export.table.toDrive(
         collection=data,
         folder='extract',
         description=os.path.join('plot_' + str(i)),
         selectors=['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12', 'date', 'spacecraft_id','id'],
+        # selectors=['id','date','B2'],
         fileFormat='CSV').start()
-    print("Submit all tasks to Google Earth Engine")
     # GEE can only handle 3000 tasks at once -> add sleep time to avoid overflow
-    # if DELAY:
-    #     if (int(i) % int(STEPS)) == 0: # every STEPS steps of for-loop
-    #         time.sleep(DELAYTIME)
+    if DELAY:
+        if (int(i + 1) % int(STEPS)) == 0: # every STEPS steps of for-loop
+            time.sleep(DELAYTIME)
