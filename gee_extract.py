@@ -17,7 +17,23 @@ CLD_PRJ_DIST = 1.2
 BUFFER = 50
 
 # load shape
-fc = ee.FeatureCollection('users/dongshew96/buffered_inpolysites')
+sdate = '2020-07-09' # incomplete scene is from july 11th
+edate = '2022-07-25' # complete scene for comparison from 13th
+
+aoi = ee.FeatureCollection('users/jk90fub/somepoints')
+
+s2 = ee.ImageCollection('COPERNICUS/S2_SR').filterBounds(aoi).filterDate(sdate, edate)
+
+a = s2.toList(1) # creates list of first 10 entries of the image collection
+b = a.getInfo() # creates dictionary holding properties of these images
+
+
+
+
+
+
+
+
 
 ### cloud masking part for Sentinel-2 (all adapted from Pia Labenski; be aware that this code is NOT PUBLIC
 ### (although mainly adpoted from GEE tutorial) -> do not share)
