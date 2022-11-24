@@ -103,9 +103,11 @@ DELAY = False
 STEPS = 3000
 DELAYTIME = 20000 # e.g. 32,400 seconds == 9 hours
 
-for i in range(0, 10):
+for i in range(5000, 8000):
 # for i in range(0, fc.size().getInfo()):
     feature = ee.Feature(fc.toList(fc.size()).get(i))
+    info = fc.toList(fc.size()).get(i).getInfo()
+    poly_id = info['properties']['id']
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
     startDate = '2017-01-01'
     endDate = '2021-12-31'
@@ -127,7 +129,7 @@ for i in range(0, 10):
     ee.batch.Export.table.toDrive(
         collection=data,
         folder=f'extract_cloud{CLOUD_FILTER}',
-        description=os.path.join('plot_' + str(i)),
+        description=os.path.join('plot_' + str(poly_id)),
         selectors=['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12', 'date', 'spacecraft_id','id'],
         fileFormat='CSV').start()
     # GEE can only handle 3000 tasks at once -> add sleep time to avoid overflow
