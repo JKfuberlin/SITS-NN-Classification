@@ -56,8 +56,6 @@ def count_date() -> None:
     out_path = os.path.join(OUTPUT_DIR, DATE_CSV)
     export_csv_file(output, out_path, index=False)
 
-count_date()
-
 # %%
 def shuffle(df:pd.DataFrame, ref:pd.DataFrame) -> pd.DataFrame:
     df = pd.DataFrame.join(ref, df)
@@ -97,7 +95,7 @@ def merge_data_frame(data_frames:List[pd.DataFrame]) -> None:
     export_csv_file(merged_df, out_path, False)
 
 # %%
-def merge() -> None:
+def build_dataset() -> None:
     # load all csv from folder
     # and turn into list of data frames
     data_frames = []
@@ -119,9 +117,8 @@ def merge() -> None:
             export_csv_file(df, out_path, True)
     # merge_data_frame(data_frames)
 
-merge()
-
-# %%
 
 
-
+if __name__ == '__main__':
+    count_date()
+    build_dataset()

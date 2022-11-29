@@ -103,7 +103,7 @@ DELAY = False
 STEPS = 3000
 DELAYTIME = 20000 # e.g. 32,400 seconds == 9 hours
 
-for i in range(5000, 8000):
+for i in range(9000, fc.size().getInfo()):
 # for i in range(0, fc.size().getInfo()):
     feature = ee.Feature(fc.toList(fc.size()).get(i))
     info = fc.toList(fc.size()).get(i).getInfo()

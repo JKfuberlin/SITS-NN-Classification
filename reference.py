@@ -72,8 +72,6 @@ def export_reference_data() -> None:
     df.drop(columns=cols, inplace=True)
     export_csv_file(df, REF_CSV)
 
-export_reference_data()
-
 # %%
 def build_label() -> None:
     ref = load_csv_file(REF_CSV)
@@ -83,7 +81,6 @@ def build_label() -> None:
     # -1: other deciduous
     cols = ['Spruce', 'Beech', 'Coniferous', 'Deciduous', 'id']
     labels = []
-    count = 0
     for index, row in ref.iterrows():
         label = pd.DataFrame(columns=cols, index=[0])
         label.fillna(value=0, inplace=True)
@@ -93,17 +90,16 @@ def build_label() -> None:
                 label['Spruce'] += row[i + 8] / 100
             elif row[i] == 710:
                 label['Beech'] += row[i + 8] / 100
-            elif row[i] >= 200 and row[i] <= 600:
+            elif row[i] >= 200 and row[i] <= 590:
                 label['Coniferous'] += row[i + 8] / 100
-            elif row[i] > 590 and row[i] != 710:
+            elif row[i] >=600 and row[i] != 710:
                 label['Deciduous'] += row[i + 8] / 100
         labels.append(label)
     output = pd.concat(labels, ignore_index=True)
     export_csv_file(output, LABEL_CSV)
 
-build_label()
-
-# %%
 
 
-
+if __name__ == '__main__':
+    export_reference_data()
+    build_label()
