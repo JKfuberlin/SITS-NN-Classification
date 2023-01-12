@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import Tensor
 import torch.utils.data as Data
-import utils.csv_func as csv
+import utils.csv as csv
 import os
 
 
@@ -24,7 +24,7 @@ def load_csv_data(data_dir:str, label_path:str) -> np.ndarray:
     return x_data, y_data
 
 
-def buil_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int):
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int):
     dataset = Data.TensorDataset(x_set, y_set)
     # split dataset
     size = len(dataset)

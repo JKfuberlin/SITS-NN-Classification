@@ -1,10 +1,11 @@
 import numpy as np
-import pandas as pd
 import torch
 from torch import nn, optim
+import os
+import sys
+sys.path.append('../')
 import utils.dataset as dataset
 from models.lstm import ClassificationLSTM
-import os
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     # dataset
     x_data, y_data = dataset.load_csv_data(DATA_DIR, label_path)
     x_set, y_set = build_dataset(x_data, y_data)
-    train_loader, val_loader = dataset.buil_dataloader(x_set, y_set, BATCH_SIZE, SEED)
+    train_loader, val_loader = dataset.build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
     # model
     model = ClassificationLSTM(input_size, hidden_size, layer1_dim, layer2_dim, num_layers, num_classes).to(device)
     # loss and optimizer
@@ -89,5 +90,5 @@ if __name__ == "__main__":
     for epoch in range(EPOCH):
         train(model, epoch)
         validate(model)
-
-    
+    # save model
+    # torch.save(model, '../outputs/model.pkl')

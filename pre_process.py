@@ -1,5 +1,5 @@
 import geopandas as gpd
-import utils.csv_func as csv
+import utils.csv as csv
 import os
 
 
