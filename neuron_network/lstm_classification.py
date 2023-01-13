@@ -4,6 +4,7 @@ from torch import nn, optim, Tensor
 import torch.utils.data as Data
 import os
 import sys
+from typing import Tuple
 sys.path.append('../')
 import utils.csv as csv
 from models.lstm import ClassificationLSTM
@@ -29,7 +30,8 @@ layer1_dim = 256
 layer2_dim = 128
 
 
-def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray):
+def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
+    """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     # embedding
     embedding = nn.Embedding(8000, input_size)
     # reduce dimention from (n, 1) to (n, )
@@ -40,7 +42,8 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray):
     return x_set, y_set
 
 
-def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int):
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
+    """Build and split dataset, and generate dataloader for training and validation"""
     dataset = Data.TensorDataset(x_set, y_set)
     # split dataset
     size = len(dataset)
@@ -100,7 +103,7 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # dataset
     x_data, y_data = csv.to_numpy(DATA_DIR, label_path)
-    x_set, y_set = build_dataset(x_data, y_data)
+    x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
     # model
     model = ClassificationLSTM(input_size, hidden_size, layer1_dim, layer2_dim, num_layers, num_classes).to(device)

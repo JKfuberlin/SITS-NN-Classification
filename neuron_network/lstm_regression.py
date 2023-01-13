@@ -3,6 +3,7 @@ import torch
 from torch import nn, optim, Tensor
 import torch.utils.data as Data
 from torchmetrics import R2Score
+from typing import Tuple
 import os
 import sys
 sys.path.append('../')
@@ -29,7 +30,8 @@ num_layers = 2
 num_classes = 7
 
 
-def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray):
+def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
+    """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     # embedding
     embedding = nn.Embedding(8000, input_size)
     x_set = torch.from_numpy(x_data)
@@ -38,7 +40,8 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray):
     return x_set, y_set
 
 
-def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int):
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
+    """Build and split dataset, and generate dataloader for training and validation"""
     dataset = Data.TensorDataset(x_set, y_set)
     # split dataset
     size = len(dataset)
