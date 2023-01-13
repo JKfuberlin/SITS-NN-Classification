@@ -1,11 +1,12 @@
 import numpy as np
 import torch
-from torch import nn, optim
+from torch import nn, optim, Tensor
+import torch.utils.data as Data
 from torchmetrics import R2Score
 import os
 import sys
 sys.path.append('../')
-import utils.dataset as dataset
+import utils.csv as csv
 from models.lstm import RegressionLSTM
 
 
@@ -28,7 +29,7 @@ num_layers = 2
 num_classes = 7
 
 
-def build_dataset(x_data:np.ndarray, y_data:np.ndarray):
+def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray):
     # embedding
     embedding = nn.Embedding(8000, input_size)
     x_set = torch.from_numpy(x_data)
@@ -36,6 +37,26 @@ def build_dataset(x_data:np.ndarray, y_data:np.ndarray):
     x_set = embedding(x_set).detach()
     return x_set, y_set
 
+
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int):
+    dataset = Data.TensorDataset(x_set, y_set)
+    # split dataset
+    size = len(dataset)
+    train_size, val_size = round(0.8 * size), round(0.2 * size)
+    generator = torch.Generator().manual_seed(seed)
+    train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
+    # # manually split dataset
+    # x_train = x_set[:444]
+    # y_train = y_set[:444]
+    # x_val = x_set[444:]
+    # y_val = y_set[444:]
+    # train_dataset = Data.TensorDataset(x_train, y_train)
+    # val_dataset = Data.TensorDataset(x_val, y_val)
+    # data_loader
+    train_loader = Data.DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=2)
+    val_loader = Data.DataLoader(val_dataset,batch_size=len(val_dataset), shuffle=True,num_workers=2)
+    return train_loader, val_loader
+    
 
 def train(model:nn.Module, epoch:int):
     total_step = len(train_loader)
@@ -82,9 +103,9 @@ if __name__ == "__main__":
     # Device configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # dataset
-    x_data, y_data = dataset.load_csv_data(DATA_DIR, label_path)
-    x_set, y_set = build_dataset(x_data, y_data)
-    train_loader, val_loader = dataset.build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
+    x_data, y_data = csv.to_numpy(DATA_DIR, label_path)
+    x_set, y_set = numpy_to_tensor(x_data, y_data)
+    train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
     # model
     model = RegressionLSTM(input_size, hidden_size, num_layers, num_classes).to(device)
     # loss and optimizer

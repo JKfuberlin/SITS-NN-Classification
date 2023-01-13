@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 
 
@@ -20,3 +21,21 @@ def export(df:pd.DataFrame, file_path:str, index:bool) -> None:
 def delete(file_path:str) -> None:
     os.remove(file_path)
     print(f'delete file {file_path}')
+
+
+def to_numpy(data_dir:str, label_path:str) -> np.ndarray:
+    labels = load(label_path, 'id')
+    x_list = []
+    y_list = []
+    for index, row in labels.iterrows():
+        df_path = os.path.join(data_dir, f'{index}.csv')
+        df = load(df_path, 'date')
+        x = np.array(df, dtype=int)
+        x = x.reshape(-1)
+        y = row[:]
+        x_list.append(x)
+        y_list.append(y)
+    # transfer Dataframe to array
+    x_data = np.array(x_list)
+    y_data = np.array(y_list)
+    return x_data, y_data
