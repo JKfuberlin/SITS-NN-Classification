@@ -28,6 +28,7 @@ def delete(file_path:str) -> None:
 
 def to_numpy(data_dir:str, label_path:str) -> Tuple[np.ndarray, np.ndarray]:
     """Load label and time series data, transfer them to numpy array"""
+    print("Load training data")
     labels = load(label_path, 'id')
     x_list = []
     y_list = []
@@ -42,4 +43,5 @@ def to_numpy(data_dir:str, label_path:str) -> Tuple[np.ndarray, np.ndarray]:
     # transfer Dataframe to array
     x_data = np.array(x_list)
     y_data = np.array(y_list)
+    print("Transfered data to numpy array")
     return x_data, y_data
