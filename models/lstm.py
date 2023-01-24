@@ -5,9 +5,9 @@ import torch.nn.functional as F
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class ClassificationLSTM(nn.Module):
+class LSTMClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, layer1_dim, layer2_dim, num_layers, num_classes):
-        super(ClassificationLSTM, self).__init__()
+        super(LSTMClassifier, self).__init__()
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
@@ -31,9 +31,9 @@ class ClassificationLSTM(nn.Module):
         return out
 
 
-class RegressionLSTM(nn.Module):
+class LSTMRegression(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
-        super(RegressionLSTM, self).__init__()
+        super(LSTMRegression, self).__init__()
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)

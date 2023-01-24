@@ -7,7 +7,8 @@ import sys
 from typing import Tuple
 sys.path.append('../')
 import utils.csv as csv
-from models.lstm import ClassificationLSTM
+from models.lstm import LSTMClassifier
+import utils.validation as val
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
@@ -85,16 +86,15 @@ def train(model:nn.Module, epoch:int):
 def validate(model:nn.Module):
     model.eval()
     with torch.no_grad():
-        correct = 0
+        good_pred = 0
         total = 0
         for (values, labels) in val_loader:
             values = values.to(device)
             labels = labels.to(device)
             outputs = model(values)
             total += labels.size(0)
-            _, predicted = torch.max(outputs.data, 1)
-            correct += (predicted == labels).sum().item()
-    print('Test Accuracy of the model: {} %'.format(100 * correct / total))
+            good_pred += val.true_pred_num(labels, outputs)
+    print('Test Accuracy of the model: {} %'.format(100 * good_pred / total))
 
 
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
     # model
-    model = ClassificationLSTM(input_size, hidden_size, layer1_dim, layer2_dim, num_layers, num_classes).to(device)
+    model = LSTMClassifier(input_size, hidden_size, layer1_dim, layer2_dim, num_layers, num_classes).to(device)
     # loss and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), LR)

@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
-import torch.nn.functional as F
-from torch.nn import Transformer, Embedding
+from torch.nn.modules.normalization import LayerNorm
+from torch.nn import Transformer, Embedding, TransformerEncoder, TransformerEncoderLayer
 import math
 
 
@@ -51,14 +51,14 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-class RegressionTransformer(nn.Module):
+class TransformerRegression(nn.Module):
     def __init__(self, src_sz:int, tgt_sz:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
-        super(RegressionTransformer, self).__init__()
+        super(TransformerRegression, self).__init__()
         self.d_model = d_model
-        # encoder
+        # encoder embedding
         self.src_embd = Embedding(src_sz, d_model)
         self.pos_encoder = PositionalEncoding(d_model)
-        # decoder
+        # decoder embedding
         self.tgt_embd = Embedding(tgt_sz, d_model)
         self.pos_decoder = PositionalEncoding(d_model)
         # transformer model
@@ -76,11 +76,35 @@ class RegressionTransformer(nn.Module):
         output:Tensor = self.transformer(src=src, tgt=tgt, tgt_mask=tgt_mask)
         # output: [seq_len, batch_size, dim_embd]
         # label: [seq_len, batch_size]
-        seq, batch = output.size()[0], output.size()[1]
+        seq, batch = output.size(0), output.size(1)
         output = output.view([seq, -1])
         # output: [seq_len, batch_size * dim_embd]
         fc = nn.Linear(self.d_model * batch, batch).to(device)
         output = self.softmax(fc(output))
+        return output
+
+
+class TransformerClassifier(nn.Module):
+    def __init__(self, src_sz:int, seq_len:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+        super(TransformerClassifier, self).__init__()
+        # encoder embedding
+        self.src_embd = Embedding(src_sz, d_model)
+        self.pos_encoder = PositionalEncoding(d_model)
+        # transformer model
+        encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward)
+        encoder_norm = LayerNorm(d_model)
+        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
+        # classification
+        self.fc = nn.Linear(seq_len * d_model, num_classes)
+
+    def forward(self, src:Tensor) -> Tensor:
+        src = self.src_embd(src)
+        src = self.pos_encoder(src)
+        output:Tensor = self.transformer_encoder(src)
+        batch_sz = output.size(1) 
+        # reshape to [batch_size, seq_len * d_model]
+        output = output.view([batch_sz, -1])
+        output = self.fc(output)
         return output
 
 

@@ -8,7 +8,7 @@ import os
 import sys
 sys.path.append('../')
 import utils.csv as csv
-from models.lstm import RegressionLSTM
+from models.lstm import LSTMRegression
 
 
 # file path
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
     # model
-    model = RegressionLSTM(input_size, hidden_size, num_layers, num_classes).to(device)
+    model = LSTMRegression(input_size, hidden_size, num_layers, num_classes).to(device)
     # loss and optimizer
     criterion = nn.MSELoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)

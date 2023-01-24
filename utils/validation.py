@@ -16,8 +16,9 @@ def is_valid(labels: Tensor, outputs:Tensor) -> Tensor:
     res = rule_1 | rule_2 | rule_3
     return res.sum(dim=0)
 
-def valid_num(labels: Tensor, outputs:Tensor) -> int:
-    """Return number of valid prediction for each batch"""
+
+def valid_pred_num(labels: Tensor, outputs:Tensor) -> int:
+    """Return valid prediction number of regression for each batch"""
     assert outputs.size != labels.size(), "Size of outputs and labels should be equal"
     tgt_len = labels.size(0)
     res = is_valid(labels, outputs)
@@ -33,4 +34,11 @@ def valid_r2_num(labels: Tensor, outputs:Tensor, based_r2:float=0.5) -> int:
     r2:Tensor = r2score(labels/100., outputs)
     num = (r2 > based_r2).sum().item()
     return num
-    
+
+
+def true_pred_num(labels: Tensor, outputs:Tensor) -> int:
+    """Return true prediction number of classification for each batch"""
+    assert outputs.size != labels.size(), "Size of outputs and labels should be equal"
+    _, predicted = torch.max(outputs.data, 1)
+    num = (predicted == labels).sum().item()
+    return num
