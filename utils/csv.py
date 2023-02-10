@@ -35,8 +35,8 @@ def to_numpy(data_dir:str, label_path:str) -> Tuple[np.ndarray, np.ndarray]:
     for index, row in labels.iterrows():
         df_path = os.path.join(data_dir, f'{index}.csv')
         df = load(df_path, 'date')
-        x = np.array(df, dtype=int)
-        x = x.reshape(-1)
+        x = np.array(df).astype(np.float32)
+        # x = x.reshape(-1)
         y = row[:]
         x_list.append(x)
         y_list.append(y)

@@ -5,7 +5,7 @@ from torch.nn import Transformer, Embedding, TransformerEncoder, TransformerEnco
 import math
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
 class PositionalEncoding(nn.Module):
@@ -52,43 +52,37 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerRegression(nn.Module):
-    def __init__(self, src_sz:int, tgt_sz:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+    def __init__(self, num_bands:int, seq_len:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
         super(TransformerRegression, self).__init__()
         self.d_model = d_model
         # encoder embedding
-        self.src_embd = Embedding(src_sz, d_model)
+        self.src_embd = nn.Linear(num_bands, d_model)
         self.pos_encoder = PositionalEncoding(d_model)
-        # decoder embedding
-        self.tgt_embd = Embedding(tgt_sz, d_model)
-        self.pos_decoder = PositionalEncoding(d_model)
         # transformer model
-        self.transformer = Transformer(d_model, nhead, num_layers, num_layers, dim_feedforward)
+        encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward)
+        encoder_norm = LayerNorm(d_model)
+        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # regression
-        # self.fc = nn.Linear(d_model * batch_size, batch_size)
-        self.softmax = nn.Softmax(dim=0)
+        self.fc = nn.Linear(seq_len * d_model, num_classes)
+        self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, src:Tensor, tgt:Tensor) -> Tensor:
+    def forward(self, src:Tensor) -> Tensor:
         src = self.src_embd(src)
         src = self.pos_encoder(src)
-        tgt_mask = generate_square_subsequent_mask(len(tgt)).to(device)
-        tgt = self.tgt_embd(tgt)
-        tgt = self.pos_decoder(tgt)
-        output:Tensor = self.transformer(src=src, tgt=tgt, tgt_mask=tgt_mask)
+        output:Tensor = self.transformer_encoder(src)
         # output: [seq_len, batch_size, dim_embd]
-        # label: [seq_len, batch_size]
-        seq, batch = output.size(0), output.size(1)
-        output = output.view([seq, -1])
-        # output: [seq_len, batch_size * dim_embd]
-        fc = nn.Linear(self.d_model * batch, batch).to(device)
-        output = self.softmax(fc(output))
+        batch = output.size(1)
+        output = output.view([batch, -1])
+        # output: [batch_sz, seq_len * d_model]
+        output = self.softmax(self.fc(output))
         return output
 
 
 class TransformerClassifier(nn.Module):
-    def __init__(self, src_sz:int, seq_len:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+    def __init__(self, num_bands:int, seq_len:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
         super(TransformerClassifier, self).__init__()
         # encoder embedding
-        self.src_embd = Embedding(src_sz, d_model)
+        self.src_embd = nn.Linear(num_bands, d_model)
         self.pos_encoder = PositionalEncoding(d_model)
         # transformer model
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward)
@@ -98,6 +92,7 @@ class TransformerClassifier(nn.Module):
         self.fc = nn.Linear(seq_len * d_model, num_classes)
 
     def forward(self, src:Tensor) -> Tensor:
+        # src: [seq_len, batch_sz, num_bands]
         src = self.src_embd(src)
         src = self.pos_encoder(src)
         output:Tensor = self.transformer_encoder(src)
