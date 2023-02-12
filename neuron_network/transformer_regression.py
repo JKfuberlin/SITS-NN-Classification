@@ -14,20 +14,19 @@ import utils.plot as plot
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
-DATA_DIR = os.path.join(PATH, 'monthly_mean')
+DATA_DIR = os.path.join(PATH, 'daily')
 LABEL_CSV = '7_classes.csv'
 TITLE = 'transformer_regression'
 label_path = os.path.join(PATH, LABEL_CSV)
 
 # general hyperparameters
 BATCH_SIZE = 128
-LR = 0.01
+LR = 0.001
 EPOCH = 5
-SEED = 1231
+SEED = 24
 
 # hyperparameters for Transformer model
 num_bands = 10
-seq_len = 25
 num_classes = 7
 d_model = 8
 nhead = 4
@@ -57,7 +56,7 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int):
     # val_dataset = Data.TensorDataset(x_val, y_val)
     # data_loader
     train_loader = Data.DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=4)
-    val_loader = Data.DataLoader(val_dataset,batch_size=32, shuffle=True,num_workers=4)
+    val_loader = Data.DataLoader(val_dataset,batch_size=batch_size, shuffle=True,num_workers=4)
     return train_loader, val_loader
 
 
@@ -131,15 +130,16 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
     # model
-    model = TransformerRegression(num_bands, seq_len, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
+    model = TransformerRegression(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     # loss and optimizer
     criterion = nn.MSELoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
-    # train and validate model
+    # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []
     train_epoch_acc = []
     val_epoch_acc = []
+    # train and validate model
     print("Start training")
     for epoch in range(EPOCH):
         train(model, epoch)

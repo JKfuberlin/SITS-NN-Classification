@@ -52,9 +52,8 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerRegression(nn.Module):
-    def __init__(self, num_bands:int, seq_len:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+    def __init__(self, num_bands:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
         super(TransformerRegression, self).__init__()
-        self.d_model = d_model
         # encoder embedding
         self.src_embd = nn.Linear(num_bands, d_model)
         self.pos_encoder = PositionalEncoding(d_model)
@@ -63,23 +62,22 @@ class TransformerRegression(nn.Module):
         encoder_norm = LayerNorm(d_model)
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # regression
-        self.fc = nn.Linear(seq_len * d_model, num_classes)
+        self.fc = nn.Linear(d_model, num_classes)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, src:Tensor) -> Tensor:
         src = self.src_embd(src)
         src = self.pos_encoder(src)
         output:Tensor = self.transformer_encoder(src)
-        # output: [seq_len, batch_size, dim_embd]
-        batch = output.size(1)
-        output = output.view([batch, -1])
-        # output: [batch_sz, seq_len * d_model]
-        output = self.softmax(self.fc(output))
+        # output: [seq_len, batch_sz, d_model]
+        output = self.fc(output[-1, :, :])
+        output = self.softmax(output)
+        # final shape: [batch_sz, num_classes]
         return output
 
 
 class TransformerClassifier(nn.Module):
-    def __init__(self, num_bands:int, seq_len:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+    def __init__(self, num_bands:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
         super(TransformerClassifier, self).__init__()
         # encoder embedding
         self.src_embd = nn.Linear(num_bands, d_model)
@@ -89,17 +87,18 @@ class TransformerClassifier(nn.Module):
         encoder_norm = LayerNorm(d_model)
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # classification
-        self.fc = nn.Linear(seq_len * d_model, num_classes)
+        self.fc = nn.Linear(d_model, num_classes)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, src:Tensor) -> Tensor:
         # src: [seq_len, batch_sz, num_bands]
         src = self.src_embd(src)
         src = self.pos_encoder(src)
-        output:Tensor = self.transformer_encoder(src)
-        batch_sz = output.size(1) 
-        # reshape to [batch_size, seq_len * d_model]
-        output = output.view([batch_sz, -1])
-        output = self.fc(output)
+        output = self.transformer_encoder(src)
+        # output: [seq_len, batch_sz, d_model]
+        output = self.fc(output[-1, :, :])
+        output = self.softmax(output)
+        # final shape: [batch_sz, num_classes]
         return output
 
 

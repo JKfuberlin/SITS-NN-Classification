@@ -28,20 +28,30 @@ def delete(file_path:str) -> None:
 
 def to_numpy(data_dir:str, label_path:str) -> Tuple[np.ndarray, np.ndarray]:
     """Load label and time series data, transfer them to numpy array"""
-    print("Load training data")
+    print("load training data")
     labels = load(label_path, 'id')
+    # Step 1: find max time steps
+    max_len = 0
+    for index, row in labels.iterrows():
+        df_path = os.path.join(data_dir, f'{index}.csv')
+        df = load(df_path, 'date', True)
+        max_len = max(max_len, df.shape[0])
+    print(f'max sequence length: {max_len}')
+    # Step 2: transfer to numpy array
     x_list = []
     y_list = []
     for index, row in labels.iterrows():
         df_path = os.path.join(data_dir, f'{index}.csv')
-        df = load(df_path, 'date')
+        df = load(df_path, 'date', True)
         x = np.array(df).astype(np.float32)
-        # x = x.reshape(-1)
+        # use 0 padding make sequence length equal
+        padding = np.zeros((max_len - x.shape[0], x.shape[1]))
+        x = np.concatenate((x, padding), dtype=np.float32)
         y = row[:]
         x_list.append(x)
         y_list.append(y)
-    # transfer Dataframe to array
+    # concatenate array list
     x_data = np.array(x_list)
     y_data = np.array(y_list)
-    print("Transfered data to numpy array")
+    print("transfered data to numpy array")
     return x_data, y_data

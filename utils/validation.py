@@ -2,15 +2,17 @@ import torch
 from torch import Tensor
 from torchmetrics import R2Score
 
+
 # Device configuration
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
 
 def is_valid(labels: Tensor, outputs:Tensor) -> Tensor:
     """Return boolean of prediction for each polygon based on followed rules"""
     # prediction >=50% is main species
     # rule_1 = (labels >= 0.5) & (outputs >= 0.5)
     # prediction <=10% is regarded as not exist
-    rule_2 = (labels == 0) & (outputs <= 0.1)
+    rule_2 = (labels == 0) & (outputs < 0.05)
     # prediction between >5% is regarded as exist
     rule_3 = (labels > 0) & (outputs >= 0.05)
     res = rule_2 | rule_3

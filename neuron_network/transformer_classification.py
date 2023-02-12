@@ -14,7 +14,7 @@ import utils.plot as plot
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
-DATA_DIR = os.path.join(PATH, 'monthly_mean')
+DATA_DIR = os.path.join(PATH, 'daily')
 LABEL_CSV = '_label.csv'
 TITLE = 'transformer_classification'
 label_path = os.path.join(PATH, LABEL_CSV)
@@ -23,16 +23,15 @@ label_path = os.path.join(PATH, LABEL_CSV)
 BATCH_SIZE = 128
 LR = 0.001
 EPOCH = 5
-SEED = 12345
+SEED = 24
 
 # hyperparameters for Transformer model
 num_bands = 10
-seq_len = 25
 num_classes = 5
-d_model = 8
+d_model = 16
 nhead = 4
 num_layers = 1
-dim_feedforward = 8
+dim_feedforward = 32
 
 
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
@@ -101,22 +100,31 @@ def validate(model:nn.Module):
         good_pred = 0
         total = 0
         losses = []
+        y_true = []
+        y_pred = []
         for (inputs, labels) in val_loader:
             # exchange dimension 0 and 1 of inputs depending on batch_first or not
             inputs:Tensor = inputs.transpose(0, 1)
             inputs = inputs.to(device)
-            labels = labels.to(device)
+            labels:Tensor = labels.to(device)
             # prediction
-            outputs = model(inputs)
+            outputs:Tensor = model(inputs)
             loss = criterion(outputs, labels)
             # recording validation accuracy
             good_pred += val.true_pred_num(labels, outputs)
             total += labels.size(0)
             # record validation loss
             losses.append(loss.item())
+            # record labels
+            _, predicted = torch.max(outputs.data, 1)
+            y_true += labels.tolist()
+            y_pred += predicted.tolist()
         # average train loss and accuracy for one epoch
         acc = good_pred / total
         val_loss = np.average(losses)
+        # confusion matrix
+        if acc > max(val_epoch_acc):
+            plot.draw_confusion_matrix(y_true, y_pred, TITLE)
         # record loss and accuracy
         val_epoch_loss.append(val_loss)
         val_epoch_acc.append(acc)
@@ -133,15 +141,16 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
     # model
-    model = TransformerClassifier(num_bands, seq_len, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
+    model = TransformerClassifier(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     # loss and optimizer
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
-    # train and validate model
+    # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []
-    train_epoch_acc = []
-    val_epoch_acc = []
+    train_epoch_acc = [0]
+    val_epoch_acc = [0]
+    # train and validate model
     print("Start training")
     for epoch in range(EPOCH):
         train(model, epoch)

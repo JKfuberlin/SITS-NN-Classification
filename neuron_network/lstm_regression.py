@@ -14,22 +14,22 @@ import utils.plot as plot
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
-DATA_DIR = os.path.join(PATH, 'monthly_mean')
+DATA_DIR = os.path.join(PATH, 'daily')
 LABEL_CSV = '7_classes.csv'
 TITLE = 'lstm_regression'
 label_path = os.path.join(PATH, LABEL_CSV)
 
 # general hyperparameters
 BATCH_SIZE = 128
-LR = 0.01
-EPOCH = 5
-SEED = 13943
+LR = 0.001
+EPOCH = 50
+SEED = 24
 
 # hyperparameters for LSTM
 num_bands = 10
-input_size = 5
-hidden_size = 16
-num_layers = 1
+input_size = 32
+hidden_size = 64
+num_layers = 2
 num_classes = 7
 
 
@@ -74,7 +74,7 @@ def train(model:nn.Module, epoch:int):
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         # recording training accuracy
-        good_pred += val.valid_r2_num(labels, outputs)
+        good_pred += val.valid_pred_num(labels, outputs)
         total += labels.size(0)
         # record training loss
         losses.append(loss.item())
@@ -106,7 +106,7 @@ def validate(model:nn.Module):
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             # recording validation accuracy
-            good_pred += val.valid_r2_num(labels, outputs)
+            good_pred += val.valid_pred_num(labels, outputs)
             total += labels.size(0)
             # record validation loss
             losses.append(loss.item())
@@ -133,11 +133,12 @@ if __name__ == "__main__":
     # loss and optimizer
     criterion = nn.MSELoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
-    # train and validate model
+    # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []
     train_epoch_acc = []
     val_epoch_acc = []
+    # train and validate model
     print("Start training")
     for epoch in range(EPOCH):
         train(model, epoch)
