@@ -1,10 +1,11 @@
 from matplotlib import pyplot as plt 
 from matplotlib.ticker import MaxNLocator
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, r2_score
+import pandas as pd
 from typing import List
 
 
-def draw(y_train:List[float], y_val:List[float], name:str, model:str) -> None:
+def draw(y_train:List[float], y_val:List[float], name:str, method:str, model:str) -> None:
     """
     Visualise the change of loss or accuracy over epochs
     @params:
@@ -24,11 +25,11 @@ def draw(y_train:List[float], y_val:List[float], name:str, model:str) -> None:
     plt.ylabel("Value")
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     # set title and legend
-    title = model + '_' + name
+    title = f'{model} {name}'
     plt.title(title)
     plt.legend()
     # save figure and clear
-    plt.savefig('../outputs/'+ title +'.jpg')
+    plt.savefig(f'../outputs/pics/{method}/{title}.jpg')
     plt.clf()
 
 
@@ -47,12 +48,40 @@ def draw_confusion_matrix(y_true:List[int], y_pred:List[int], model:str) -> None
                     color="white" if matrix[i, j] >= thresh else "black")
     # set title and label
     indices = range(len(matrix))
-    classes = ['Spruce', 'Beech', 'Pine', 'Douglas fir', 'Oak']
+    # *************************change class here*************************
+    classes = ['Spruce', 'Beech', 'Pine', 'Fir', 'Oak']
+    # *******************************************************************
     title = f'{model} confusion matrix'
     plt.xticks(indices, classes, rotation=45)
     plt.yticks(indices, classes)
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+    plt.title(title)
     # save figure and clear
-    plt.savefig('../outputs/'+ title +'.jpg')
+    plt.savefig('../outputs/pics/classification/'+ title +'.jpg')
+    plt.clf()
+
+
+def draw_scatter_plot(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
+    """Draw scatter plot with r2 for each class"""
+    assert ref.shape == pred.shape, "reference and prediction must have the same shape"
+    fig, axes = plt.subplots(3, 3, figsize=(12, 12), sharex=True, sharey=True)
+    for i in range(ref.shape[1]):
+        header = ref.columns[i]
+        y_pred = pred.iloc[:, i]
+        y_true = ref.iloc[:, i]
+        r2 = r2_score(y_true, y_pred)
+        plt.subplot(3, 3, i + 1)
+        plt.text(0.5, 0.5, f'r2 = {r2:.2f}', fontdict={'weight':'bold', 'size':15}, ha='center')
+        plt.scatter(y_pred, y_true, s = 15, c='lightblue')
+        plt.xlim(-0.01, 1.01)
+        plt.ylim(-0.01, 1.01)
+        plt.title(header)
+        if i % 3 == 0:
+            plt.ylabel('Reference')
+        if i // 3 == 2:
+            plt.xlabel('Prediction')
+    # save figure and clear
+    title = f'{model} scatter plot'
+    plt.savefig('../outputs/pics/regression/'+ title +'.jpg')
     plt.clf()

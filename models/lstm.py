@@ -16,6 +16,7 @@ class LSTMClassifier(nn.Module):
         self.relu = nn.ReLU()
         self.linear2 = nn.Linear(256, 128)
         self.fc = nn.Linear(hidden_size, num_classes)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x:Tensor):
         # x shape (batch, time_step, input_size)
@@ -29,6 +30,7 @@ class LSTMClassifier(nn.Module):
         # tmp1 = self.relu(self.linear1(lstm_out[:,-1,:]))
         # tmp2 = self.relu(self.linear2(tmp1))
         out = self.fc(lstm_out[:,-1,:])
+        out = self.softmax(out)
         return out
 
 

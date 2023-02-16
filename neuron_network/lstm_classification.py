@@ -14,15 +14,19 @@ import utils.plot as plot
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
-DATA_DIR = os.path.join(PATH, 'daily')
-LABEL_CSV = '_label.csv'
-TITLE = 'lstm_classification'
-label_path = os.path.join(PATH, LABEL_CSV)
+DATA_DIR = os.path.join(PATH, 'daily_padding')
+LABEL_CSV = 'label_pure.csv'
+METHOD = 'classification'
+MODEL = 'lstm'
+UID = '5pure'
+MODEL_NAME = MODEL + '_' + UID
+LABEL_PATH = os.path.join(PATH, LABEL_CSV)
+MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
 BATCH_SIZE = 128
 LR = 0.001
-EPOCH = 50
+EPOCH = 5
 SEED = 24
 
 # hyperparameters for LSTM
@@ -31,6 +35,12 @@ input_size = 32
 hidden_size = 64
 num_layers = 2
 num_classes = 5
+
+
+def setup_seed(seed:int) -> None:
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
 
 
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
@@ -42,19 +52,22 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tenso
     return x_set, y_set
 
 
-def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
+    # # automatically split dataset
     # dataset = Data.TensorDataset(x_set, y_set)
-    # # split dataset
     # size = len(dataset)
     # train_size, val_size = round(0.8 * size), round(0.2 * size)
-    # generator = torch.Generator().manual_seed(seed)
+    # generator = torch.Generator()
     # train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
+    # ------------------------------------------------------------------------------------------
     # manually split dataset
+    # *******************change number here*******************
     x_train = x_set[:1105]
     y_train = y_set[:1105]
     x_val = x_set[1105:]
     y_val = y_set[1105:]
+    # ******************************************************
     train_dataset = Data.TensorDataset(x_train, y_train)
     val_dataset = Data.TensorDataset(x_val, y_val)
     # data_loader
@@ -63,7 +76,7 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, seed:int) -> Tu
     return train_loader, val_loader
 
 
-def train(model:nn.Module, epoch:int):
+def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     model.train()
     good_pred = 0
     total = 0
@@ -87,21 +100,17 @@ def train(model:nn.Module, epoch:int):
     # average train loss and accuracy for one epoch
     acc = good_pred / total
     train_loss = np.average(losses)
-    # record loss and accuracy
-    train_epoch_loss.append(train_loss)
-    train_epoch_acc.append(acc)
     print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '
         .format(epoch+1, EPOCH, train_loss, acc * 100), end="")
+    return train_loss, acc
 
 
-def validate(model:nn.Module):
+def validate(model:nn.Module) -> Tuple[float, float]:
     model.eval()
     with torch.no_grad():
         good_pred = 0
         total = 0
         losses = []
-        y_true = []
-        y_pred = []
         for (inputs, labels) in val_loader:
             # put the data in gpu
             inputs:Tensor = inputs.to(device)
@@ -114,35 +123,49 @@ def validate(model:nn.Module):
             total += labels.size(0)
             # record validation loss
             losses.append(loss.item())
-            # record labels
-            _, predicted = torch.max(outputs.data, 1)
-            y_true += labels.tolist()
-            y_pred += predicted.tolist()
         # average train loss and accuracy for one epoch
         acc = good_pred / total
         val_loss = np.average(losses)
-        # confusion matrix
-        if acc > max(val_epoch_acc):
-            plot.draw_confusion_matrix(y_true, y_pred, TITLE)
-        # record loss and accuracy
-        val_epoch_loss.append(val_loss)
-        val_epoch_acc.append(acc)
     print('| Validation Loss: {:.4f} | Validation Accuracy: {:.2f}%'
         .format(val_loss, 100 * acc))
+    return val_loss, acc
+
+
+def test(model:nn.Module) -> None:
+    """Test best model"""
+    model.eval()
+    with torch.no_grad():
+        y_true = []
+        y_pred = []
+        for (inputs, labels) in val_loader:
+            inputs:Tensor = inputs.to(device)
+            labels:Tensor = labels.to(device)
+            outputs:Tensor = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            y_true += labels.tolist()
+            y_pred += predicted.tolist()
+        plot.draw_confusion_matrix(y_true, y_pred, MODEL_NAME)  
 
 
 
 if __name__ == "__main__":
+    # set random seed
+    setup_seed(SEED)
     # Device configuration
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # dataset
-    x_data, y_data = csv.to_numpy(DATA_DIR, label_path)
+    x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
-    train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE, SEED)
+    train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes).to(device)
     # loss and optimizer
-    criterion = nn.CrossEntropyLoss()
+    # ******************change number of samples here******************
+    # samples = torch.tensor([643, 254, 327, 1434])
+    # mx = max(samples)
+    # weight = torch.tensor([1., 1., 1., 0.5])
+    # *****************************************************************
+    criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
     # evaluate terms
     train_epoch_loss = []
@@ -152,11 +175,19 @@ if __name__ == "__main__":
     # train and validate model
     print("Start training")
     for epoch in range(EPOCH):
-        train(model, epoch)
-        validate(model)
+        train_loss, train_acc = train(model, epoch)
+        val_loss, val_acc = validate(model)
+        if val_acc > min(val_epoch_acc):
+            torch.save(model.state_dict(), MODEL_PATH)
+        # record loss and accuracy
+        train_epoch_loss.append(train_loss)
+        train_epoch_acc.append(train_acc)
+        val_epoch_loss.append(val_loss)
+        val_epoch_acc.append(val_acc)
     # visualize loss and accuracy during training and validation
-    plot.draw(train_epoch_loss, val_epoch_loss, 'loss', TITLE)
-    plot.draw(train_epoch_acc, val_epoch_acc, 'accuracy', TITLE)
+    plot.draw(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
+    plot.draw(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
+    # draw confusion matrix
+    model.load_state_dict(torch.load(MODEL_PATH))
+    test(model)
     print('Plot result successfully')
-    # save model
-    # torch.save(model, f'../outputs/{TITLE}.pkl')

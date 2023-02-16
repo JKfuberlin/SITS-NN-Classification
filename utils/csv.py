@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Tuple
+from typing import Tuple, List
 import os
 
 
@@ -31,12 +31,12 @@ def to_numpy(data_dir:str, label_path:str) -> Tuple[np.ndarray, np.ndarray]:
     print("load training data")
     labels = load(label_path, 'id')
     # Step 1: find max time steps
-    max_len = 0
-    for index, row in labels.iterrows():
-        df_path = os.path.join(data_dir, f'{index}.csv')
-        df = load(df_path, 'date', True)
-        max_len = max(max_len, df.shape[0])
-    print(f'max sequence length: {max_len}')
+    # max_len = 0
+    # for index, row in labels.iterrows():
+    #     df_path = os.path.join(data_dir, f'{index}.csv')
+    #     df = load(df_path, 'date', True)
+    #     max_len = max(max_len, df.shape[0])
+    # print(f'max sequence length: {max_len}')
     # Step 2: transfer to numpy array
     x_list = []
     y_list = []
@@ -45,8 +45,8 @@ def to_numpy(data_dir:str, label_path:str) -> Tuple[np.ndarray, np.ndarray]:
         df = load(df_path, 'date', True)
         x = np.array(df).astype(np.float32)
         # use 0 padding make sequence length equal
-        padding = np.zeros((max_len - x.shape[0], x.shape[1]))
-        x = np.concatenate((x, padding), dtype=np.float32)
+        # padding = np.zeros((max_len - x.shape[0], x.shape[1]))
+        # x = np.concatenate((x, padding), dtype=np.float32)
         y = row[:]
         x_list.append(x)
         y_list.append(y)
@@ -55,3 +55,10 @@ def to_numpy(data_dir:str, label_path:str) -> Tuple[np.ndarray, np.ndarray]:
     y_data = np.array(y_list)
     print("transfered data to numpy array")
     return x_data, y_data
+
+
+def list_to_dataframe(lst:List[List[float]], cols:List[str]) -> pd.DataFrame:
+    """Transfer list to pd.DataFrame"""
+    df = pd.DataFrame(lst, columns=cols)
+    df = df.round(2)
+    return df
