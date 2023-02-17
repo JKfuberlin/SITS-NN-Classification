@@ -76,6 +76,31 @@ class TransformerRegression(nn.Module):
         return output
 
 
+class TransformerMultiLabel(nn.Module):
+    def __init__(self, num_bands:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+        super(TransformerMultiLabel, self).__init__()
+        # encoder embedding
+        self.src_embd = nn.Linear(num_bands, d_model)
+        self.pos_encoder = PositionalEncoding(d_model)
+        # transformer model
+        encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward)
+        encoder_norm = LayerNorm(d_model)
+        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
+        # regression
+        self.fc = nn.Linear(d_model, num_classes)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, src:Tensor) -> Tensor:
+        src = self.src_embd(src)
+        src = self.pos_encoder(src)
+        output:Tensor = self.transformer_encoder(src)
+        # output: [seq_len, batch_sz, d_model]
+        output = self.fc(output[-1, :, :])
+        output = self.sigmoid(output)
+        # final shape: [batch_sz, num_classes]
+        return output
+
+
 class TransformerClassifier(nn.Module):
     def __init__(self, num_bands:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
         super(TransformerClassifier, self).__init__()

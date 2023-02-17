@@ -151,7 +151,10 @@ def test(model:nn.Module) -> None:
             _, predicted = torch.max(outputs.data, 1)
             y_true += labels.tolist()
             y_pred += predicted.tolist()
-        plot.draw_confusion_matrix(y_true, y_pred, MODEL_NAME) 
+        # *************************change class here*************************
+        classes = ['Spruce', 'Beech', 'Pine', 'Fir', 'Oak']
+        # *******************************************************************
+        plot.draw_confusion_matrix(y_true, y_pred, classes, MODEL_NAME) 
 
 
 

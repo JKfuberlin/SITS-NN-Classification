@@ -1,6 +1,7 @@
 import torch
 from torch import Tensor
 from torchmetrics import R2Score
+from torchmetrics.classification import MultilabelAccuracy
 
 
 # Device configuration
@@ -48,3 +49,11 @@ def true_pred_num(labels: Tensor, outputs:Tensor) -> int:
     _, predicted = torch.max(outputs.data, 1)
     num = (predicted == labels).sum().item()
     return num
+
+
+def multi_label_acc(y_true:Tensor, y_pred:Tensor) -> float:
+    """Return total correct prediction number of multi-label for each batch"""
+    assert y_true.size() == y_pred.size(), "Size of outputs and labels should be equal"
+    mla = MultilabelAccuracy(num_labels=y_true.size(1)).to(device)
+    acc = mla(y_pred, y_true).item()
+    return acc

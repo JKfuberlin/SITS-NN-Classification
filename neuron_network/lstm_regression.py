@@ -142,8 +142,8 @@ def test(model:nn.Module) -> None:
         cols = ['Spruce', 'Beech', 'Pine', 'Douglas fir', 'Oak', 'Coniferous', 'Deciduous']
         ref = csv.list_to_dataframe(y_true, cols)
         pred = csv.list_to_dataframe(y_pred, cols)
-        csv.export(ref, f'../outputs/csv/{MODEL_NAME}_ref.csv', False)
-        csv.export(pred, f'../outputs/csv/{MODEL_NAME}_pred.csv', False)
+        csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)
+        csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', False)
         plot.draw_scatter_plot(ref, pred, MODEL_NAME)
 
 

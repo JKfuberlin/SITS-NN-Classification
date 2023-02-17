@@ -4,7 +4,7 @@ from typing import Tuple, List
 import os
 
 
-def load(file_path:str, index_col:str, date=False) -> pd.DataFrame:
+def load(file_path:str, index_col:str, date:bool=False) -> pd.DataFrame:
     """Load csv file to pandas.Dataframe"""
     if date:
         df = pd.read_csv(file_path, sep=',', header=0, parse_dates = ['date'], index_col=index_col)
@@ -15,7 +15,7 @@ def load(file_path:str, index_col:str, date=False) -> pd.DataFrame:
     return df
 
 
-def export(df:pd.DataFrame, file_path:str, index:bool) -> None:
+def export(df:pd.DataFrame, file_path:str, index:bool=True) -> None:
     """Export pandas.Dataframe to csv file"""
     df.to_csv(file_path, index=index)
     print(f'export file {file_path}')
@@ -57,8 +57,11 @@ def to_numpy(data_dir:str, label_path:str) -> Tuple[np.ndarray, np.ndarray]:
     return x_data, y_data
 
 
-def list_to_dataframe(lst:List[List[float]], cols:List[str]) -> pd.DataFrame:
+def list_to_dataframe(lst:List[List[float]], cols:List[str], decimal:bool=True) -> pd.DataFrame:
     """Transfer list to pd.DataFrame"""
     df = pd.DataFrame(lst, columns=cols)
-    df = df.round(2)
+    if decimal:
+        df = df.round(2)
+    else:
+        df = df.astype('int')
     return df

@@ -33,7 +33,7 @@ def draw(y_train:List[float], y_val:List[float], name:str, method:str, model:str
     plt.clf()
 
 
-def draw_confusion_matrix(y_true:List[int], y_pred:List[int], model:str) -> None:
+def draw_confusion_matrix(y_true:List[int], y_pred:List[int], classes:List[str], model:str) -> None:
     """Draw consufion matrix to visualise classification result"""
     assert len(y_pred) == len(y_true), "y_true and y_pred must have the same length"
     # calculate confusion matrix
@@ -48,9 +48,6 @@ def draw_confusion_matrix(y_true:List[int], y_pred:List[int], model:str) -> None
                     color="white" if matrix[i, j] >= thresh else "black")
     # set title and label
     indices = range(len(matrix))
-    # *************************change class here*************************
-    classes = ['Spruce', 'Beech', 'Pine', 'Fir', 'Oak']
-    # *******************************************************************
     title = f'{model} confusion matrix'
     plt.xticks(indices, classes, rotation=45)
     plt.yticks(indices, classes)

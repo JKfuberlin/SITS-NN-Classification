@@ -2,12 +2,12 @@ import numpy as np
 import torch
 from torch import nn, optim, Tensor
 import torch.utils.data as Data
+from typing import Tuple
 import os
 import sys
-from typing import Tuple
 sys.path.append('../')
 import utils.csv as csv
-from models.lstm import LSTMClassifier
+from models.lstm import LSTMMultiLabel
 import utils.validation as val
 import utils.plot as plot
 
@@ -15,10 +15,10 @@ import utils.plot as plot
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
 DATA_DIR = os.path.join(PATH, 'daily_padding')
-LABEL_CSV = 'label_pure.csv'
-METHOD = 'classification'
+LABEL_CSV = 'label_multi.csv'
+METHOD = 'multi_label'
 MODEL = 'lstm'
-UID = '5pure'
+UID = '7ml'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, LABEL_CSV)
 MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
@@ -34,7 +34,7 @@ num_bands = 10
 input_size = 32
 hidden_size = 64
 num_layers = 2
-num_classes = 5
+num_classes = 7
 
 
 def setup_seed(seed:int) -> None:
@@ -45,41 +45,35 @@ def setup_seed(seed:int) -> None:
 
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
     """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
-    # reduce dimention from (n, 1) to (n, )
-    y_data = y_data.reshape(-1)
     x_set = torch.from_numpy(x_data)
-    y_set = torch.from_numpy(y_data)
+    y_set = torch.from_numpy(y_data).float()
     return x_set, y_set
 
 
 def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
-    # # automatically split dataset
-    # dataset = Data.TensorDataset(x_set, y_set)
-    # size = len(dataset)
-    # train_size, val_size = round(0.8 * size), round(0.2 * size)
-    # generator = torch.Generator()
-    # train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
-    # ------------------------------------------------------------------------------------------
-    # manually split dataset
-    # *******************change number here*******************
-    x_train = x_set[:1105]
-    y_train = y_set[:1105]
-    x_val = x_set[1105:]
-    y_val = y_set[1105:]
-    # ******************************************************
-    train_dataset = Data.TensorDataset(x_train, y_train)
-    val_dataset = Data.TensorDataset(x_val, y_val)
+    dataset = Data.TensorDataset(x_set, y_set)
+    # split dataset
+    size = len(dataset)
+    train_size, val_size = round(0.8 * size), round(0.2 * size)
+    generator = torch.Generator()
+    train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
+    # # manually split dataset
+    # x_train = x_set[:444]
+    # y_train = y_set[:444]
+    # x_val = x_set[444:]
+    # y_val = y_set[444:]
+    # train_dataset = Data.TensorDataset(x_train, y_train)
+    # val_dataset = Data.TensorDataset(x_val, y_val)
     # data_loader
     train_loader = Data.DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=4)
     val_loader = Data.DataLoader(val_dataset,batch_size=batch_size, shuffle=True,num_workers=4)
     return train_loader, val_loader
-
+    
 
 def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     model.train()
-    good_pred = 0
-    total = 0
+    accs = []
     losses = []
     for i, (inputs, labels) in enumerate(train_loader):
         # put the data in gpu
@@ -89,8 +83,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         # recording training accuracy
-        good_pred += val.true_pred_num(labels, outputs)
-        total += labels.size(0)
+        accs.append(val.multi_label_acc(labels, outputs))
         # record training loss
         losses.append(loss.item())
         # backward and optimize
@@ -98,7 +91,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
         loss.backward()
         optimizer.step()
     # average train loss and accuracy for one epoch
-    acc = good_pred / total
+    acc = np.average(accs)
     train_loss = np.average(losses)
     print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '
         .format(epoch+1, EPOCH, train_loss, acc * 100), end="")
@@ -107,24 +100,22 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
 
 def validate(model:nn.Module) -> Tuple[float, float]:
     model.eval()
+    accs = []
+    losses = []
     with torch.no_grad():
-        good_pred = 0
-        total = 0
-        losses = []
         for (inputs, labels) in val_loader:
             # put the data in gpu
-            inputs:Tensor = inputs.to(device)
-            labels:Tensor = labels.to(device)
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             # prediction
-            outputs:Tensor = model(inputs)
+            outputs = model(inputs)
             loss = criterion(outputs, labels)
             # recording validation accuracy
-            good_pred += val.true_pred_num(labels, outputs)
-            total += labels.size(0)
+            accs.append(val.multi_label_acc(labels, outputs))
             # record validation loss
             losses.append(loss.item())
         # average train loss and accuracy for one epoch
-        acc = good_pred / total
+        acc = np.average(accs)
         val_loss = np.average(losses)
     print('| Validation Loss: {:.4f} | Validation Accuracy: {:.2f}%'
         .format(val_loss, 100 * acc))
@@ -141,13 +132,17 @@ def test(model:nn.Module) -> None:
             inputs:Tensor = inputs.to(device)
             labels:Tensor = labels.to(device)
             outputs:Tensor = model(inputs)
-            _, predicted = torch.max(outputs.data, 1)
+            predicted = torch.where(outputs >= 0.5, 1, 0)
             y_true += labels.tolist()
             y_pred += predicted.tolist()
-        # *************************change class here*************************
-        classes = ['Spruce', 'Beech', 'Pine', 'Fir', 'Oak']
-        # *******************************************************************
-        plot.draw_confusion_matrix(y_true, y_pred, classes, MODEL_NAME)  
+        cols = ['Spruce', 'Beech', 'Silver fir', 'Pine', 'Douglas fir', 'Oak', 'Sycamore']
+        ref = csv.list_to_dataframe(y_true, cols, False)
+        pred = csv.list_to_dataframe(y_pred, cols, False)
+        cmp = (ref == pred).sum(axis=1)
+        equal_num = (cmp == num_classes).sum()
+        print(f'{equal_num}/{ref.shape[0]} predictions are totally equal to references')
+        csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)
+        csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', False)
 
 
 
@@ -161,14 +156,9 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
-    model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes).to(device)
+    model = LSTMMultiLabel(num_bands, input_size, hidden_size, num_layers, num_classes).to(device)
     # loss and optimizer
-    # ******************change number of samples here******************
-    # samples = torch.tensor([643, 254, 327, 1434])
-    # mx = max(samples)
-    # weight = torch.tensor([1., 1., 1., 0.5])
-    # *****************************************************************
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = nn.BCELoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
     # evaluate terms
     train_epoch_loss = []
@@ -190,7 +180,7 @@ if __name__ == "__main__":
     # visualize loss and accuracy during training and validation
     plot.draw(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
     plot.draw(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
-    # draw confusion matrix
+    # draw scatter plot
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
     print('Plot result successfully')
