@@ -180,8 +180,8 @@ if __name__ == "__main__":
         val_epoch_loss.append(val_loss)
         val_epoch_acc.append(val_acc)
     # visualize loss and accuracy during training and validation
-    plot.draw(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
-    plot.draw(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
+    plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
+    plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
     # draw scatter plot
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)

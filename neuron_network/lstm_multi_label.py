@@ -138,11 +138,9 @@ def test(model:nn.Module) -> None:
         cols = ['Spruce', 'Beech', 'Silver fir', 'Pine', 'Douglas fir', 'Oak', 'Sycamore']
         ref = csv.list_to_dataframe(y_true, cols, False)
         pred = csv.list_to_dataframe(y_pred, cols, False)
-        cmp = (ref == pred).sum(axis=1)
-        equal_num = (cmp == num_classes).sum()
-        print(f'{equal_num}/{ref.shape[0]} predictions are totally equal to references')
         csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)
         csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', False)
+        plot.draw_pie_chart(ref, pred, MODEL_NAME)
 
 
 
@@ -178,8 +176,8 @@ if __name__ == "__main__":
         val_epoch_loss.append(val_loss)
         val_epoch_acc.append(val_acc)
     # visualize loss and accuracy during training and validation
-    plot.draw(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
-    plot.draw(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
+    plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
+    plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
     # draw scatter plot
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)

@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 from torch.nn.modules.normalization import LayerNorm
-from torch.nn import Transformer, Embedding, TransformerEncoder, TransformerEncoderLayer
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
 import math
 
 
@@ -62,8 +62,14 @@ class TransformerRegression(nn.Module):
         encoder_norm = LayerNorm(d_model)
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # regression
-        self.fc = nn.Linear(d_model, num_classes)
-        self.softmax = nn.Softmax(dim=1)
+        self.fc = nn.Sequential(
+                    nn.Linear(d_model, 256),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(256),
+                    nn.Dropout(0.3),
+                    nn.Linear(256, num_classes),
+                    nn.Softmax(dim=1)
+                )
 
     def forward(self, src:Tensor) -> Tensor:
         src = self.src_embd(src)
@@ -71,7 +77,6 @@ class TransformerRegression(nn.Module):
         output:Tensor = self.transformer_encoder(src)
         # output: [seq_len, batch_sz, d_model]
         output = self.fc(output[-1, :, :])
-        output = self.softmax(output)
         # final shape: [batch_sz, num_classes]
         return output
 
@@ -87,8 +92,14 @@ class TransformerMultiLabel(nn.Module):
         encoder_norm = LayerNorm(d_model)
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # regression
-        self.fc = nn.Linear(d_model, num_classes)
-        self.sigmoid = nn.Sigmoid()
+        self.fc = nn.Sequential(
+                    nn.Linear(d_model, 256),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(256),
+                    nn.Dropout(0.3),
+                    nn.Linear(256, num_classes),
+                    nn.Sigmoid()
+                )
 
     def forward(self, src:Tensor) -> Tensor:
         src = self.src_embd(src)
@@ -96,7 +107,6 @@ class TransformerMultiLabel(nn.Module):
         output:Tensor = self.transformer_encoder(src)
         # output: [seq_len, batch_sz, d_model]
         output = self.fc(output[-1, :, :])
-        output = self.sigmoid(output)
         # final shape: [batch_sz, num_classes]
         return output
 
@@ -112,8 +122,14 @@ class TransformerClassifier(nn.Module):
         encoder_norm = LayerNorm(d_model)
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # classification
-        self.fc = nn.Linear(d_model, num_classes)
-        self.softmax = nn.Softmax(dim=1)
+        self.fc = nn.Sequential(
+                    nn.Linear(d_model, 256),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(256),
+                    nn.Dropout(0.3),
+                    nn.Linear(256, num_classes),
+                    nn.Softmax(dim=1)
+                )
 
     def forward(self, src:Tensor) -> Tensor:
         # src: [seq_len, batch_sz, num_bands]
@@ -122,7 +138,6 @@ class TransformerClassifier(nn.Module):
         output = self.transformer_encoder(src)
         # output: [seq_len, batch_sz, d_model]
         output = self.fc(output[-1, :, :])
-        output = self.softmax(output)
         # final shape: [batch_sz, num_classes]
         return output
 

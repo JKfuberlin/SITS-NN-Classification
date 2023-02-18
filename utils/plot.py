@@ -5,7 +5,7 @@ import pandas as pd
 from typing import List
 
 
-def draw(y_train:List[float], y_val:List[float], name:str, method:str, model:str) -> None:
+def draw_curve(y_train:List[float], y_val:List[float], name:str, method:str, model:str) -> None:
     """
     Visualise the change of loss or accuracy over epochs
     @params:
@@ -81,4 +81,29 @@ def draw_scatter_plot(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
     # save figure and clear
     title = f'{model} scatter plot'
     plt.savefig('../outputs/pics/regression/'+ title +'.jpg')
+    plt.clf()
+
+
+def draw_pie_chart(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
+    """Draw pie chart to show true predicted label number for multi-label classification"""
+    assert ref.shape == pred.shape, "reference and prediction must have the same shape"
+    # compare reference and prediction
+    res = (ref == pred).sum(axis=1)
+    # pie chart
+    x = []
+    labels = []
+    gaps = []
+    plt.figure(figsize=(8,8))
+    for i in range(ref.shape[1]+1):
+        num = (res == i).sum()
+        x.append(num)
+        labels.append(i)
+        gaps.append(0.05)
+    plt.pie(x, labels=labels, explode=gaps, autopct='%.0f%%', textprops={"size":10})
+    # set title and legend
+    plt.title(f'{model} predicted true labels')
+    plt.legend()
+    # save figure and clear
+    title = f'{model} pie chart'
+    plt.savefig('../outputs/pics/multi_label/'+ title +'.jpg')
     plt.clf()

@@ -1,6 +1,5 @@
 import torch
 from torch import nn,Tensor
-import torch.nn.functional as F
 
 # Device configuration
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
