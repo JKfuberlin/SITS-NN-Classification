@@ -146,6 +146,7 @@ def test(model:nn.Module) -> None:
         csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)
         csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', False)
         plot.draw_pie_chart(ref, pred, MODEL_NAME)
+        plot.draw_multi_confusion_matirx(ref, pred, MODEL_NAME)
 
 
 
