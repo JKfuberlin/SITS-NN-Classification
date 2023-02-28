@@ -5,6 +5,7 @@ import torch.utils.data as Data
 from typing import Tuple
 import os
 import sys
+import json
 sys.path.append('../')
 import utils.csv as csv
 from models.lstm import LSTMMultiLabel
@@ -35,6 +36,30 @@ input_size = 32
 hidden_size = 64
 num_layers = 2
 num_classes = 7
+
+
+def save_hyperparameters() -> None:
+    """Save hyperparameters into a json file"""
+    params = {
+        'general hyperparameters': {
+            'batch size': BATCH_SIZE,
+            'learning rate': LR, 
+            'epoch': EPOCH,
+            'seed': SEED
+        },
+        f'{MODEL} hyperparameters': {
+            'number of bands': num_bands,
+            'embedding size': input_size,
+            'hidden size': hidden_size,
+            'number of layers': num_layers,
+            'number of classes': num_classes
+        }
+    }
+    out_path = f'../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
+    with open(out_path, 'w') as f:
+        data = json.dumps(params, indent=4)
+        f.write(data)
+    print('saved hyperparameters')
 
 
 def setup_seed(seed:int) -> None:
@@ -156,6 +181,7 @@ if __name__ == "__main__":
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = LSTMMultiLabel(num_bands, input_size, hidden_size, num_layers, num_classes).to(device)
+    save_hyperparameters()
     # loss and optimizer
     criterion = nn.BCELoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
@@ -165,7 +191,7 @@ if __name__ == "__main__":
     train_epoch_acc = [0]
     val_epoch_acc = [0]
     # train and validate model
-    print("Start training")
+    print("start training")
     for epoch in range(EPOCH):
         train_loss, train_acc = train(model, epoch)
         val_loss, val_acc = validate(model)
@@ -182,4 +208,4 @@ if __name__ == "__main__":
     # draw scatter plot
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
-    print('Plot result successfully')
+    print('plot result successfully')

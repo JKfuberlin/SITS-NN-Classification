@@ -5,6 +5,7 @@ import torch.utils.data as Data
 from typing import Tuple
 import os
 import sys
+import json
 sys.path.append('../')
 import utils.csv as csv
 from models.transformer import TransformerRegression
@@ -37,6 +38,31 @@ d_model = 8
 nhead = 4
 num_layers = 1
 dim_feedforward = 8
+
+
+def save_hyperparameters() -> None:
+    """Save hyperparameters into a json file"""
+    params = {
+        'general hyperparameters': {
+            'batch size': BATCH_SIZE,
+            'learning rate': LR, 
+            'epoch': EPOCH,
+            'seed': SEED
+        },
+        f'{MODEL} hyperparameters': {
+            'number of bands': num_bands,
+            'embedding size': d_model,
+            'number of heads': nhead,
+            'number of layers': num_layers,
+            'feedforward dimension': dim_feedforward,
+            'number of classes': num_classes
+        }
+    }
+    out_path = f'../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
+    with open(out_path, 'w') as f:
+        data = json.dumps(params, indent=4)
+        f.write(data)
+    print('saved hyperparameters')
 
 
 def setup_seed(seed:int) -> None:
@@ -164,6 +190,7 @@ if __name__ == "__main__":
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = TransformerRegression(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
+    save_hyperparameters()
     # loss and optimizer
     criterion = nn.MSELoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
@@ -173,7 +200,7 @@ if __name__ == "__main__":
     train_epoch_acc = [0]
     val_epoch_acc = [0]
     # train and validate model
-    print("Start training")
+    print("start training")
     for epoch in range(EPOCH):
         train_loss, train_acc = train(model, epoch)
         val_loss, val_acc = validate(model)
@@ -190,4 +217,4 @@ if __name__ == "__main__":
     # draw scatter plot
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
-    print('Plot result successfully')
+    print('plot result successfully')

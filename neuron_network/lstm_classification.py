@@ -4,6 +4,7 @@ from torch import nn, optim, Tensor
 import torch.utils.data as Data
 import os
 import sys
+import json
 from typing import Tuple
 sys.path.append('../')
 import utils.csv as csv
@@ -35,6 +36,30 @@ input_size = 32
 hidden_size = 64
 num_layers = 2
 num_classes = 5
+
+
+def save_hyperparameters() -> None:
+    """Save hyperparameters into a json file"""
+    params = {
+        'general hyperparameters': {
+            'batch size': BATCH_SIZE,
+            'learning rate': LR, 
+            'epoch': EPOCH,
+            'seed': SEED
+        },
+        f'{MODEL} hyperparameters': {
+            'number of bands': num_bands,
+            'embedding size': input_size,
+            'hidden size': hidden_size,
+            'number of layers': num_layers,
+            'number of classes': num_classes
+        }
+    }
+    out_path = f'../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
+    with open(out_path, 'w') as f:
+        data = json.dumps(params, indent=4)
+        f.write(data)
+    print('saved hyperparameters')
 
 
 def setup_seed(seed:int) -> None:
@@ -145,7 +170,7 @@ def test(model:nn.Module) -> None:
             y_true += labels.tolist()
             y_pred += predicted.tolist()
         # *************************change class here*************************
-        classes = ['Spruce', 'Beech', 'Pine', 'Fir', 'Oak']
+        classes = ['Spruce', 'Beech', 'Pine', 'Douglas fir', 'Oak']
         # *******************************************************************
         plot.draw_confusion_matrix(y_true, y_pred, classes, MODEL_NAME)  
 
@@ -162,11 +187,12 @@ if __name__ == "__main__":
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes).to(device)
+    save_hyperparameters()
     # loss and optimizer
     # ******************change number of samples here******************
     # samples = torch.tensor([643, 254, 327, 1434])
     # mx = max(samples)
-    # weight = torch.tensor([1., 1., 1., 0.5])
+    # weight = torch.tensor([1., 1., 1., 1.1, 1.])
     # *****************************************************************
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
@@ -176,7 +202,7 @@ if __name__ == "__main__":
     train_epoch_acc = [0]
     val_epoch_acc = [0]
     # train and validate model
-    print("Start training")
+    print("start training")
     for epoch in range(EPOCH):
         train_loss, train_acc = train(model, epoch)
         val_loss, val_acc = validate(model)
@@ -193,4 +219,4 @@ if __name__ == "__main__":
     # draw confusion matrix
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
-    print('Plot result successfully')
+    print('plot results successfully')

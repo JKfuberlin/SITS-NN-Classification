@@ -5,6 +5,7 @@ import torch.utils.data as Data
 from typing import Tuple
 import os
 import sys
+import json
 sys.path.append('../')
 import utils.csv as csv
 from models.transformer import TransformerClassifier
@@ -36,6 +37,31 @@ d_model = 16
 nhead = 4
 num_layers = 1
 dim_feedforward = 32
+
+
+def save_hyperparameters() -> None:
+    """Save hyperparameters into a json file"""
+    params = {
+        'general hyperparameters': {
+            'batch size': BATCH_SIZE,
+            'learning rate': LR, 
+            'epoch': EPOCH,
+            'seed': SEED
+        },
+        f'{MODEL} hyperparameters': {
+            'number of bands': num_bands,
+            'embedding size': d_model,
+            'number of heads': nhead,
+            'number of layers': num_layers,
+            'feedforward dimension': dim_feedforward,
+            'number of classes': num_classes
+        }
+    }
+    out_path = f'../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
+    with open(out_path, 'w') as f:
+        data = json.dumps(params, indent=4)
+        f.write(data)
+    print('saved hyperparameters')
 
 
 def setup_seed(seed:int) -> None:
@@ -152,7 +178,7 @@ def test(model:nn.Module) -> None:
             y_true += labels.tolist()
             y_pred += predicted.tolist()
         # *************************change class here*************************
-        classes = ['Spruce', 'Beech', 'Pine', 'Fir', 'Oak']
+        classes = ['Spruce', 'Beech', 'Pine', 'Douglas fir', 'Oak']
         # *******************************************************************
         plot.draw_confusion_matrix(y_true, y_pred, classes, MODEL_NAME) 
 
@@ -169,6 +195,7 @@ if __name__ == "__main__":
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = TransformerClassifier(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
+    save_hyperparameters()
     # loss and optimizer
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
@@ -178,7 +205,7 @@ if __name__ == "__main__":
     train_epoch_acc = [0]
     val_epoch_acc = [0]
     # train and validate model
-    print("Start training")
+    print("start training")
     for epoch in range(EPOCH):
         train_loss, train_acc = train(model, epoch)
         val_loss, val_acc = validate(model)
@@ -195,4 +222,4 @@ if __name__ == "__main__":
     # draw confusion matrix
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
-    print('Plot result successfully')
+    print('plot result successfully')
