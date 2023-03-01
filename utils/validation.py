@@ -31,16 +31,15 @@ def valid_pred_num(labels: Tensor, outputs:Tensor) -> int:
     return num
 
 
-def valid_r2_num(labels: Tensor, outputs:Tensor, based_r2:float=0.5) -> int:
-    """Return number of valid prediction whose r2 is over given value"""
+def avg_r2_score(labels: Tensor, outputs:Tensor) -> int:
+    """Return average r2 of each prediction in the batch"""
     assert outputs.size() == labels.size(), "Size of outputs and labels should be equal"
     labels = labels.t()
     outputs = outputs.t()
     batch_sz = labels.size(1)
-    r2score = R2Score(num_outputs=batch_sz, multioutput='raw_values').to(device)
+    r2score = R2Score(num_outputs=batch_sz, multioutput='uniform_average').to(device)
     r2:Tensor = r2score(outputs, labels)
-    num = (r2 > based_r2).sum().item()
-    return num
+    return r2.item()
 
 
 def true_pred_num(labels: Tensor, outputs:Tensor) -> int:

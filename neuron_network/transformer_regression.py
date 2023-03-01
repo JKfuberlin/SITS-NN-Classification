@@ -19,7 +19,7 @@ DATA_DIR = os.path.join(PATH, 'daily_padding')
 LABEL_CSV = '7_classes.csv'
 METHOD = 'regression'
 MODEL = 'transformer'
-UID = '7r05'
+UID = '7rgr'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, LABEL_CSV)
 MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
@@ -29,7 +29,6 @@ BATCH_SIZE = 128
 LR = 0.001
 EPOCH = 5
 SEED = 24
-R2 = 0.5
 
 # hyperparameters for Transformer model
 num_bands = 10
@@ -102,8 +101,7 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int)-> Tuple[Data.Da
 
 def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     model.train()
-    good_pred = 0
-    total = 0
+    accs = []
     losses = []
     for i, (inputs, labels) in enumerate(train_loader):
         # exchange dimension 0 and 1 of inputs depending on batch_first or not
@@ -114,8 +112,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         # recording training accuracy
-        good_pred += val.valid_r2_num(labels, outputs)
-        total += labels.size(0)
+        accs.append(val.avg_r2_score(labels, outputs))
         # record training loss
         losses.append(loss.item())
         # backward and optimize
@@ -123,7 +120,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
         loss.backward()
         optimizer.step()
     # average train loss and accuracy for one epoch
-    acc = good_pred / total
+    acc = np.average(accs)
     train_loss = np.average(losses)
     print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '
         .format(epoch+1, EPOCH, train_loss, acc * 100), end="")
@@ -132,8 +129,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
 
 def validate(model:nn.Module) -> Tuple[float, float]:
     model.eval()
-    good_pred = 0
-    total = 0
+    accs = []
     losses = []
     with torch.no_grad():
         for (inputs, labels) in val_loader:
@@ -145,12 +141,11 @@ def validate(model:nn.Module) -> Tuple[float, float]:
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             # recording validation accuracy
-            good_pred += val.valid_r2_num(labels, outputs)
-            total += labels.size(0)
+            accs.append(val.avg_r2_score(labels, outputs))
             # record validation loss
             losses.append(loss.item())
         # average train loss and accuracy for one epoch
-        acc = good_pred / total
+        acc = np.average(accs)
         val_loss = np.average(losses)
     print('| Validation Loss: {:.4f} | Validation Accuracy: {:.2f}%'
         .format(val_loss, 100 * acc))

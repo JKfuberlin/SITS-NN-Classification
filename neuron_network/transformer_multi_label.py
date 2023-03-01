@@ -197,7 +197,7 @@ if __name__ == "__main__":
     train_epoch_acc = [0]
     val_epoch_acc = [0]
     # train and validate model
-    print("Start training")
+    print("start training")
     for epoch in range(EPOCH):
         train_loss, train_acc = train(model, epoch)
         val_loss, val_acc = validate(model)
@@ -214,4 +214,4 @@ if __name__ == "__main__":
     # draw scatter plot
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
-    print('Plot result successfully')
+    print('plot result successfully')
