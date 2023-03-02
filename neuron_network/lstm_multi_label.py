@@ -160,7 +160,9 @@ def test(model:nn.Module) -> None:
             predicted = torch.where(outputs >= 0.5, 1, 0)
             y_true += labels.tolist()
             y_pred += predicted.tolist()
+        # ***************************change classes here***************************
         cols = ['Spruce', 'Beech', 'Silver fir', 'Pine', 'Douglas fir', 'Oak', 'Sycamore']
+        # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols, False)
         pred = csv.list_to_dataframe(y_pred, cols, False)
         csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)

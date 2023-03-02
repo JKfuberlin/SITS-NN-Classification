@@ -16,10 +16,10 @@ import utils.plot as plot
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
 DATA_DIR = os.path.join(PATH, 'daily_padding')
-LABEL_CSV = '7_classes.csv'
+LABEL_CSV = '6_classes.csv'
 METHOD = 'regression'
 MODEL = 'transformer'
-UID = '7rgr'
+UID = '6rgr'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, LABEL_CSV)
 MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
@@ -165,7 +165,9 @@ def test(model:nn.Module) -> None:
             outputs:Tensor = model(inputs)
             y_true += labels.tolist()
             y_pred += outputs.tolist()
-        cols = ['Spruce', 'Beech', 'Pine', 'Douglas fir', 'Oak', 'Coniferous', 'Deciduous']
+        # ***************************change classes here***************************
+        cols = ['Spruce', 'Beech', 'Silver fir', 'Pine', 'Douglas fir', 'Oak', 'Others']
+        # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols)
         pred = csv.list_to_dataframe(y_pred, cols)
         csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)
@@ -187,7 +189,7 @@ if __name__ == "__main__":
     model = TransformerRegression(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     save_hyperparameters()
     # loss and optimizer
-    criterion = nn.MSELoss().to(device)
+    criterion = nn.SmoothL1Loss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
     # evaluate terms
     train_epoch_loss = []
