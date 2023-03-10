@@ -191,7 +191,10 @@ if __name__ == "__main__":
     model = TransformerMultiLabel(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     save_hyperparameters()
     # loss and optimizer
-    criterion = nn.BCELoss().to(device)
+    # ******************change weight here******************
+    weight = torch.tensor([1., 1., 1., 1., 1.1, 1.1])
+    # ******************************************************
+    criterion = nn.BCELoss(weight=weight).to(device)
     optimizer = optim.Adam(model.parameters(), LR)
     # evaluate terms
     train_epoch_loss = []
@@ -213,7 +216,8 @@ if __name__ == "__main__":
     # visualize loss and accuracy during training and validation
     plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
     plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
-    # draw scatter plot
+    # test best model
+    print('start testing')
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
     print('plot result successfully')

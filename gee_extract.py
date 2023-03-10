@@ -10,14 +10,14 @@ ee.Initialize()
 
 # explanation for settings:
 # https://developers.google.com/earth-engine/tutorials/community/sentinel-2-s2cloudless
-CLOUD_FILTER = 30
+CLOUD_FILTER = 10
 CLD_PRB_THRESH = 40
 NIR_DRK_THRESH = 0.2
 CLD_PRJ_DIST = 1.2
 BUFFER = 50
 
 # load shape
-fc = ee.FeatureCollection('users/dongshew96/buffered_wgs_inpolysites')
+fc = ee.FeatureCollection('users/dongshew96/bw_polygons_pure')
 
 ### cloud masking part for Sentinel-2 (all adapted from Pia Labenski; be aware that this code is NOT PUBLIC
 ### (although mainly adpoted from GEE tutorial) -> do not share)
@@ -27,13 +27,11 @@ def get_s2_sr_cld_col(aoi, start_date, end_date):  # aoi, start_date, end_date
     s2_sr_col = (ee.ImageCollection('COPERNICUS/S2_SR')  # S2_SR
                  .filterBounds(aoi)
                  .filterDate(start_date, end_date)
-                 .filter(ee.Filter.calendarRange(5, 9, 'month'))
                  .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', CLOUD_FILTER)))
     # Import and filter s2cloudless.
     s2_cloudless_col = (ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
                         .filterBounds(aoi)
-                        .filterDate(start_date, end_date)
-                        .filter(ee.Filter.calendarRange(5, 9, 'month')))                  
+                        .filterDate(start_date, end_date))                  
     # Join the filtered s2cloudless collection to the SR collection by the 'system:index' property.
     return ee.ImageCollection(ee.Join.saveFirst('s2cloudless').apply(**{
         'primary': s2_sr_col,
@@ -103,11 +101,11 @@ DELAY = False
 STEPS = 3000
 DELAYTIME = 20000 # e.g. 32,400 seconds == 9 hours
 
-for i in range(9000, fc.size().getInfo()):
+for i in range(25000, 26000):
 # for i in range(0, fc.size().getInfo()):
     feature = ee.Feature(fc.toList(fc.size()).get(i))
-    info = fc.toList(fc.size()).get(i).getInfo()
-    poly_id = info['properties']['id']
+    # info = fc.toList(fc.size()).get(i).getInfo()
+    # poly_id = info['properties']['id']
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
     startDate = '2017-01-01'
     endDate = '2021-12-31'
@@ -128,9 +126,9 @@ for i in range(9000, fc.size().getInfo()):
     print(f'saving polygon {i}')
     ee.batch.Export.table.toDrive(
         collection=data,
-        folder=f'extract_cloud{CLOUD_FILTER}',
-        description=os.path.join('plot_' + str(poly_id)),
-        selectors=['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12', 'date', 'spacecraft_id','id'],
+        folder=f'bw_polygons_pure_cloud{CLOUD_FILTER}',
+        description=os.path.join('plot_' + str(i)),
+        selectors=['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B11', 'B12', 'date', 'spacecraft_id','id'],
         fileFormat='CSV').start()
     # GEE can only handle 3000 tasks at once -> add sleep time to avoid overflow
     if DELAY:

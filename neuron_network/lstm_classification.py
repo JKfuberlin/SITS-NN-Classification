@@ -14,28 +14,29 @@ import utils.plot as plot
 
 
 # file path
-PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
-DATA_DIR = os.path.join(PATH, 'daily_padding')
+PATH='D:\\Deutschland\\FUB\\master_thesis\\data'
+DATA_DIR = os.path.join(PATH, 'gee', 'output', 'daily_padding')
 LABEL_CSV = 'label_pure.csv'
 METHOD = 'classification'
-MODEL = 'lstm'
+MODEL = 'bi-lstm'
 UID = '5pure'
 MODEL_NAME = MODEL + '_' + UID
-LABEL_PATH = os.path.join(PATH, LABEL_CSV)
+LABEL_PATH = os.path.join(PATH, 'ref', 'part', LABEL_CSV)
 MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
 BATCH_SIZE = 128
-LR = 0.001
+LR = 0.01
 EPOCH = 5
 SEED = 24
 
 # hyperparameters for LSTM
 num_bands = 10
-input_size = 32
-hidden_size = 64
-num_layers = 2
+input_size = 16
+hidden_size = 32
+num_layers = 1
 num_classes = 5
+bidirectional = True
 
 
 def save_hyperparameters() -> None:
@@ -186,7 +187,7 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
-    model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes).to(device)
+    model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
     save_hyperparameters()
     # loss and optimizer
     # ******************change number of samples here******************
@@ -216,7 +217,8 @@ if __name__ == "__main__":
     # visualize loss and accuracy during training and validation
     plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
     plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
-    # draw confusion matrix
+    # test best model
+    print('start testing')
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
     print('plot results successfully')
