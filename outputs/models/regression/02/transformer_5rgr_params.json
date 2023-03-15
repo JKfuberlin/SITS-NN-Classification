@@ -1,0 +1,16 @@
+{
+    "general hyperparameters": {
+        "batch size": 64,
+        "learning rate": 0.0001,
+        "epoch": 100,
+        "seed": 24
+    },
+    "transformer hyperparameters": {
+        "number of bands": 10,
+        "embedding size": 128,
+        "number of heads": 8,
+        "number of layers": 2,
+        "feedforward dimension": 512,
+        "number of classes": 7
+    }
+}
