@@ -199,15 +199,17 @@ if __name__ == "__main__":
     # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []
-    train_epoch_acc = [0]
-    val_epoch_acc = [0]
+    train_epoch_acc = []
+    val_epoch_acc = []
+    max_val_acc = 0
     # train and validate model
     print("start training")
     for epoch in range(EPOCH):
         train_loss, train_acc = train(model, epoch)
         val_loss, val_acc = validate(model)
-        if val_acc > min(val_epoch_acc):
+        if val_acc > max_val_acc:
             torch.save(model.state_dict(), MODEL_PATH)
+            max_val_acc = val_acc
         # record loss and accuracy
         train_epoch_loss.append(train_loss)
         train_epoch_acc.append(train_acc)

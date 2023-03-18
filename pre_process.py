@@ -7,8 +7,8 @@ import utils.csv as csv
 SHP_DIR = 'D:\\Deutschland\\FUB\\master_thesis\\data\\Reference_data\\bw_all_polygons'
 OUTPUT_DIR = 'D:\\Deutschland\\FUB\\master_thesis\\data\\ref\\all'
 INPUT_SHP = 'buffered_wgs_bw_polygons.shp'
-OUTPUT_SHP = 'bw_polygons_pure.shp'
-REF_CSV = 'reference_pure.csv'
+OUTPUT_SHP = 'bw_polygons_8main.shp'
+REF_CSV = 'reference_8main.csv'
 
 # %%
 def load_shp_file() -> gpd.GeoDataFrame:
@@ -61,6 +61,14 @@ def select_pure(gdf:gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return gdf
 
 # %%
+def select_8_main_classes(gdf:gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """select polygons mainly contain 8 classes"""
+    for i in range(1, 5):
+        expr = f'(BST1_BA_{i}==0)|(BST1_BA_{i}==110)|(BST1_BA_{i}==210)|(BST1_BA_{i}==310)|(BST1_BA_{i}==410)|(BST1_BA_{i}==600)|(BST1_BA_{i}==710)|(BST1_BA_{i}==821)|(BST1_BA_{i}==831)'
+        gdf.query(expr=expr, inplace=True)
+    return gdf
+
+# %%
 def export_csv_reference(gdf:gpd.GeoDataFrame) -> None:
     # delete unused columns
     cols = ['BST2_BA_1', 'BST2_BA_2', 'BST2_BA_3', 'BST2_BA_4', 'BST2_BA_5', 'BST2_BA_6', 'BST2_BA_7', 'BST2_BA_8', 
@@ -81,7 +89,7 @@ if __name__ == "__main__":
     # buffered_polygons = buffer(polygons)
     # export_shp_file(buffered_polygons)
     # export_csv_reference(buffered_polygons)
-    # select pure polygons
-    pure_polygons = select_pure(polygons)
-    export_shp_file(pure_polygons)
-    export_csv_reference(pure_polygons)
+    # select polygons
+    selected_polygons = select_8_main_classes(polygons)
+    export_shp_file(selected_polygons)
+    export_csv_reference(selected_polygons)

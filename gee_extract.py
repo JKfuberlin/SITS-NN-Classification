@@ -2,7 +2,6 @@
 import ee
 import os
 import time
-import random
 
 # Authent and Initialize
 ee.Authenticate()
@@ -17,7 +16,7 @@ CLD_PRJ_DIST = 1.2
 BUFFER = 50
 
 # load shape
-fc = ee.FeatureCollection('users/dongshew96/bw_polygons_pure')
+fc = ee.FeatureCollection('users/dongshew96/bw_polygons_8main')
 
 ### cloud masking part for Sentinel-2 (all adapted from Pia Labenski; be aware that this code is NOT PUBLIC
 ### (although mainly adpoted from GEE tutorial) -> do not share)
@@ -101,8 +100,11 @@ DELAY = False
 STEPS = 3000
 DELAYTIME = 20000 # e.g. 32,400 seconds == 9 hours
 
-for i in range(25000, 26000):
-# for i in range(0, fc.size().getInfo()):
+extracted = 0
+
+for i in range(16000, 19000):
+# for i in range(10000, fc.size().getInfo()):
+    extracted = i + 1
     feature = ee.Feature(fc.toList(fc.size()).get(i))
     # info = fc.toList(fc.size()).get(i).getInfo()
     # poly_id = info['properties']['id']
@@ -126,7 +128,7 @@ for i in range(25000, 26000):
     print(f'saving polygon {i}')
     ee.batch.Export.table.toDrive(
         collection=data,
-        folder=f'bw_polygons_pure_cloud{CLOUD_FILTER}',
+        folder=f'bw_polygons_8main_cloud{CLOUD_FILTER}',
         description=os.path.join('plot_' + str(i)),
         selectors=['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B11', 'B12', 'date', 'spacecraft_id','id'],
         fileFormat='CSV').start()
@@ -134,3 +136,5 @@ for i in range(25000, 26000):
     if DELAY:
         if (int(i + 1) % int(STEPS)) == 0: # every STEPS steps of for-loop
             time.sleep(DELAYTIME)
+
+print(f'task process: {extracted}/{fc.size().getInfo()}')

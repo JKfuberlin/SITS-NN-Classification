@@ -15,13 +15,13 @@ import utils.plot as plot
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data'
-DATA_DIR = os.path.join(PATH, 'gee', 'output', 'daily_padding')
-LABEL_CSV = 'label_pure.csv'
+DATA_DIR = os.path.join(PATH, 'gee', 'output', 'bw_pure_daily')
+LABEL_CSV = 'label_7pure.csv'
 METHOD = 'classification'
-MODEL = 'bi-lstm'
-UID = '5pure'
+MODEL = 'lstm'
+UID = '7pure'
 MODEL_NAME = MODEL + '_' + UID
-LABEL_PATH = os.path.join(PATH, 'ref', 'part', LABEL_CSV)
+LABEL_PATH = os.path.join(PATH, 'ref', 'all', LABEL_CSV)
 MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
@@ -33,10 +33,10 @@ SEED = 24
 # hyperparameters for LSTM
 num_bands = 10
 input_size = 16
-hidden_size = 32
+hidden_size = 16
 num_layers = 1
-num_classes = 5
-bidirectional = True
+num_classes = 7
+bidirectional = False
 
 
 def save_hyperparameters() -> None:
@@ -78,7 +78,7 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tenso
     return x_set, y_set
 
 
-def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
     # # automatically split dataset
     # dataset = Data.TensorDataset(x_set, y_set)
@@ -89,17 +89,21 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.D
     # ------------------------------------------------------------------------------------------
     # manually split dataset
     # *******************change number here*******************
-    x_train = x_set[:1105]
-    y_train = y_set[:1105]
-    x_val = x_set[1105:]
-    y_val = y_set[1105:]
+    x_train = x_set[:14212]
+    y_train = y_set[:14212]
+    x_val = x_set[14212: 15987]
+    y_val = y_set[14212: 15987]
+    x_test = x_set[15987:]
+    y_test = y_set[15987:]
     # ******************************************************
     train_dataset = Data.TensorDataset(x_train, y_train)
     val_dataset = Data.TensorDataset(x_val, y_val)
+    test_dataset = Data.TensorDataset(x_test, y_test)
     # data_loader
-    train_loader = Data.DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=4)
-    val_loader = Data.DataLoader(val_dataset,batch_size=batch_size, shuffle=True,num_workers=4)
-    return train_loader, val_loader
+    train_loader = Data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    val_loader = Data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    test_loader = Data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    return train_loader, val_loader, test_loader
 
 
 def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
@@ -163,7 +167,7 @@ def test(model:nn.Module) -> None:
     with torch.no_grad():
         y_true = []
         y_pred = []
-        for (inputs, labels) in val_loader:
+        for (inputs, labels) in test_loader:
             inputs:Tensor = inputs.to(device)
             labels:Tensor = labels.to(device)
             outputs:Tensor = model(inputs)
@@ -171,9 +175,9 @@ def test(model:nn.Module) -> None:
             y_true += labels.tolist()
             y_pred += predicted.tolist()
         # *************************change class here*************************
-        classes = ['Spruce', 'Beech', 'Pine', 'Douglas fir', 'Oak']
+        classes = ['Spruce','Douglas Fir','Pine','Oak','Red Oak','Beech','Sycamore']
         # *******************************************************************
-        plot.draw_confusion_matrix(y_true, y_pred, classes, MODEL_NAME)  
+        plot.draw_confusion_matrix(y_true, y_pred, classes, MODEL_NAME)
 
 
 
@@ -185,30 +189,31 @@ if __name__ == "__main__":
     # dataset
     x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
-    train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
+    train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
     save_hyperparameters()
     # loss and optimizer
     # ******************change number of samples here******************
-    # samples = torch.tensor([643, 254, 327, 1434])
-    # mx = max(samples)
-    # weight = torch.tensor([1., 1., 1., 1.1, 1.])
+    samples = torch.tensor([24106/5, 3413, 1345, 2019, 1199, 8010/2, 964])
+    weight = 1 / samples
     # *****************************************************************
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = nn.CrossEntropyLoss(weight=weight).to(device)
     optimizer = optim.Adam(model.parameters(), LR)
     # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []
-    train_epoch_acc = [0]
-    val_epoch_acc = [0]
+    train_epoch_acc = []
+    val_epoch_acc = []
+    max_val_acc = 0
     # train and validate model
     print("start training")
     for epoch in range(EPOCH):
         train_loss, train_acc = train(model, epoch)
         val_loss, val_acc = validate(model)
-        if val_acc > min(val_epoch_acc):
+        if val_acc > max_val_acc:
             torch.save(model.state_dict(), MODEL_PATH)
+            max_val_acc = val_acc
         # record loss and accuracy
         train_epoch_loss.append(train_loss)
         train_epoch_acc.append(train_acc)
