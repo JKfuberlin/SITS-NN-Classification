@@ -14,29 +14,35 @@ import utils.plot as plot
 
 
 # file path
-PATH='D:\\Deutschland\\FUB\\master_thesis\\data'
-DATA_DIR = os.path.join(PATH, 'gee', 'output', 'daily_padding')
-LABEL_CSV = 'label_7multi.csv'
+PATH='/home/admin/dongshen/data'
+DATA_DIR = os.path.join(PATH, 'gee', 'bw_8main_daily_padding')
+LABEL_CSV = 'label_8multi.csv'
 METHOD = 'multi_label'
 MODEL = 'bi-lstm'
-UID = '7ml'
+UID = '8ml'
 MODEL_NAME = MODEL + '_' + UID
-LABEL_PATH = os.path.join(PATH, 'ref', 'part', LABEL_CSV)
-MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
+LABEL_PATH = os.path.join(PATH, 'ref', 'all',LABEL_CSV)
+MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
-BATCH_SIZE = 128
-LR = 0.01
-EPOCH = 2
+BATCH_SIZE = 512
+LR = 0.001
+EPOCH = 100
 SEED = 24
 
 # hyperparameters for LSTM
 num_bands = 10
-input_size = 16
-hidden_size = 32
-num_layers = 1
-num_classes = 7
-bidirectional = True
+input_size = 64
+hidden_size = 128
+num_layers = 3
+num_classes = 8
+bidrectional = True
+
+
+def setup_seed(seed:int) -> None:
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
 
 
 def save_hyperparameters() -> None:
@@ -44,7 +50,7 @@ def save_hyperparameters() -> None:
     params = {
         'general hyperparameters': {
             'batch size': BATCH_SIZE,
-            'learning rate': LR, 
+            'learning rate': LR,
             'epoch': EPOCH,
             'seed': SEED
         },
@@ -56,17 +62,11 @@ def save_hyperparameters() -> None:
             'number of classes': num_classes
         }
     }
-    out_path = f'../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
+    out_path = f'../../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
     with open(out_path, 'w') as f:
         data = json.dumps(params, indent=4)
         f.write(data)
     print('saved hyperparameters')
-
-
-def setup_seed(seed:int) -> None:
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
 
 
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
@@ -168,12 +168,12 @@ def test(model:nn.Module) -> None:
             refs[:, 1:] = predicted
             y_pred += refs.tolist()
         # ***************************change classes here***************************
-        cols = ['id', 'Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore']
+        cols = ['id','Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore','Ash']
         # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols, False)
         pred = csv.list_to_dataframe(y_pred, cols, False)
-        csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', True)
-        csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', True)
+        csv.export(ref, f'../../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', True)
+        csv.export(pred, f'../../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', True)
         plot.draw_pie_chart(ref, pred, MODEL_NAME)
         plot.draw_multi_confusion_matirx(ref, pred, MODEL_NAME)
 
@@ -183,13 +183,13 @@ if __name__ == "__main__":
     # set random seed
     setup_seed(SEED)
     # Device configuration
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
     # dataset
     x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
-    model = LSTMMultiLabel(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
+    model = LSTMMultiLabel(num_bands, input_size, hidden_size, num_layers, num_classes, bidrectional).to(device)
     save_hyperparameters()
     # loss and optimizer
     # ******************change weight here******************
@@ -219,8 +219,7 @@ if __name__ == "__main__":
     # visualize loss and accuracy during training and validation
     plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
     plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
-    # test best model
-    print('start testing')
+    # draw scatter plot
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
     print('plot result successfully')

@@ -14,29 +14,35 @@ import utils.plot as plot
 
 
 # file path
-PATH='D:\\Deutschland\\FUB\\master_thesis\\data'
-DATA_DIR = os.path.join(PATH, 'gee', 'output', 'bw_pure_daily_padding')
-LABEL_CSV = 'label_7pure.csv'
+PATH='/home/admin/dongshen/data'
+DATA_DIR = os.path.join(PATH, 'gee', 'bw_pure_daily_padding')
+LABEL_CSV = 'label_8pure.csv'
 METHOD = 'classification'
 MODEL = 'lstm'
-UID = '7pure'
+UID = '8pure'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, 'ref', 'all', LABEL_CSV)
-MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
+MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
-BATCH_SIZE = 128
-LR = 0.01
-EPOCH = 5
+BATCH_SIZE = 512
+LR = 0.001
+EPOCH = 200
 SEED = 24
 
 # hyperparameters for LSTM
 num_bands = 10
-input_size = 16
-hidden_size = 16
-num_layers = 1
-num_classes = 7
+input_size = 64
+hidden_size = 128
+num_layers = 3
+num_classes = 8
 bidirectional = False
+
+
+def setup_seed(seed:int) -> None:
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
 
 
 def save_hyperparameters() -> None:
@@ -44,7 +50,7 @@ def save_hyperparameters() -> None:
     params = {
         'general hyperparameters': {
             'batch size': BATCH_SIZE,
-            'learning rate': LR, 
+            'learning rate': LR,
             'epoch': EPOCH,
             'seed': SEED
         },
@@ -56,17 +62,11 @@ def save_hyperparameters() -> None:
             'number of classes': num_classes
         }
     }
-    out_path = f'../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
+    out_path = f'../../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
     with open(out_path, 'w') as f:
         data = json.dumps(params, indent=4)
         f.write(data)
     print('saved hyperparameters')
-
-
-def setup_seed(seed:int) -> None:
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
 
 
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
@@ -85,14 +85,21 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tenso
 
 def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
+    # # automatically split dataset
+    # dataset = Data.TensorDataset(x_set, y_set)
+    # size = len(dataset)
+    # train_size, val_size = round(0.8 * size), round(0.2 * size)
+    # generator = torch.Generator()
+    # train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
+    # ------------------------------------------------------------------------------------------
     # manually split dataset
     # *******************change number here*******************
-    x_train = x_set[:14212]
-    y_train = y_set[:14212]
-    x_val = x_set[14212: 15987]
-    y_val = y_set[14212: 15987]
-    x_test = x_set[15987:]
-    y_test = y_set[15987:]
+    x_train = x_set[:14813]
+    y_train = y_set[:14813]
+    x_val = x_set[14813: 16663]
+    y_val = y_set[14813: 16663]
+    x_test = x_set[16663:]
+    y_test = y_set[16663:]
     # ******************************************************
     train_dataset = Data.TensorDataset(x_train, y_train)
     val_dataset = Data.TensorDataset(x_val, y_val)
@@ -178,12 +185,12 @@ def test(model:nn.Module) -> None:
             refs[:, 1] = predicted
             y_pred += refs.tolist()
         # *************************change class here*************************
-        classes = ['Spruce','Douglas Fir','Pine','Oak','Red Oak','Beech','Sycamore']
+        classes = ['Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Red Oak','Beech','Sycamore']
         # *******************************************************************
         ref = csv.list_to_dataframe(y_true, ['id', 'class'], False)
         pred = csv.list_to_dataframe(y_pred, ['id', 'class'], False)
-        csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', True)
-        csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', True)
+        csv.export(ref, f'../../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', True)
+        csv.export(pred, f'../../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', True)
         plot.draw_confusion_matrix(ref, pred, classes, MODEL_NAME)
 
 
@@ -192,7 +199,7 @@ if __name__ == "__main__":
     # set random seed
     setup_seed(SEED)
     # Device configuration
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
     # dataset
     x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
@@ -201,10 +208,10 @@ if __name__ == "__main__":
     model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
     save_hyperparameters()
     # loss and optimizer
-    # ******************change number of samples here******************
-    samples = torch.tensor([24106/5, 3413, 1345, 2019, 1199, 8010/2, 964])
+    # ******************change weight here******************
+    samples = torch.tensor([24106/5, 751, 3413, 1345, 2019, 1199, 8010/2, 964])
     weight = 1 / samples
-    # *****************************************************************
+    # ******************************************************
     criterion = nn.CrossEntropyLoss(weight=weight).to(device)
     optimizer = optim.Adam(model.parameters(), LR)
     # evaluate terms

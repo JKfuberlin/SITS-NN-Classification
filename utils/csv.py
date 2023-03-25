@@ -4,7 +4,7 @@ from typing import Tuple, List
 import os
 
 
-def load(file_path:str, index_col:str, date:bool=False) -> pd.DataFrame:
+def load(file_path:str, index_col:str, date=False) -> pd.DataFrame:
     """Load csv file to pandas.Dataframe"""
     if date:
         df = pd.read_csv(file_path, sep=',', header=0, parse_dates = ['date'], index_col=index_col)
@@ -15,7 +15,7 @@ def load(file_path:str, index_col:str, date:bool=False) -> pd.DataFrame:
     return df
 
 
-def export(df:pd.DataFrame, file_path:str, index:bool=True) -> None:
+def export(df:pd.DataFrame, file_path:str, index:bool) -> None:
     """Export pandas.Dataframe to csv file"""
     df.to_csv(file_path, index=index)
     print(f'export file {file_path}')

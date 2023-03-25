@@ -14,29 +14,35 @@ import utils.plot as plot
 
 
 # file path
-PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
-DATA_DIR = os.path.join(PATH, 'gee', 'output', 'bw_8main_daily_padding')
+PATH='/home/admin/dongshen/data'
+DATA_DIR = os.path.join(PATH, 'gee', 'bw_8main_daily_padding')
 LABEL_CSV = '8_main_classes.csv'
 METHOD = 'regression'
 MODEL = 'transformer'
 UID = '8rgr'
 MODEL_NAME = MODEL + '_' + UID
-LABEL_PATH = os.path.join(PATH, LABEL_CSV)
-MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
+LABEL_PATH = os.path.join(PATH, 'ref', 'all',LABEL_CSV)
+MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 LR = 0.001
-EPOCH = 5
+EPOCH = 100
 SEED = 24
 
 # hyperparameters for Transformer model
 num_bands = 10
 num_classes = 7
-d_model = 8
-nhead = 4
-num_layers = 1
-dim_feedforward = 8
+d_model = 64
+nhead = 8
+num_layers = 2
+dim_feedforward = 256
+
+
+def setup_seed(seed:int) -> None:
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
 
 
 def save_hyperparameters() -> None:
@@ -44,7 +50,7 @@ def save_hyperparameters() -> None:
     params = {
         'general hyperparameters': {
             'batch size': BATCH_SIZE,
-            'learning rate': LR, 
+            'learning rate': LR,
             'epoch': EPOCH,
             'seed': SEED
         },
@@ -57,17 +63,11 @@ def save_hyperparameters() -> None:
             'number of classes': num_classes
         }
     }
-    out_path = f'../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
+    out_path = f'../../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
     with open(out_path, 'w') as f:
         data = json.dumps(params, indent=4)
         f.write(data)
     print('saved hyperparameters')
-
-
-def setup_seed(seed:int) -> None:
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
 
 
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
@@ -158,7 +158,7 @@ def test(model:nn.Module) -> None:
     with torch.no_grad():
         y_true = []
         y_pred = []
-        for (inputs, labels) in val_loader:
+        for (inputs, labels) in test_loader:
             inputs:Tensor = inputs.transpose(0, 1)
             inputs = inputs.to(device)
             labels:Tensor = labels.to(device)
@@ -166,12 +166,12 @@ def test(model:nn.Module) -> None:
             y_true += labels.tolist()
             y_pred += outputs.tolist()
         # ***************************change classes here***************************
-        cols = ['Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore','Ash', 'Others']
+        cols = ['Spruce', 'Beech', 'Silver fir', 'Pine', 'Douglas fir', 'Oak', 'Others']
         # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols)
         pred = csv.list_to_dataframe(y_pred, cols)
-        csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)
-        csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', False)
+        csv.export(ref, f'../../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)
+        csv.export(pred, f'../../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', False)
         plot.draw_scatter_plot(ref, pred, MODEL_NAME)
 
 
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     # set random seed
     setup_seed(SEED)
     # Device configuration
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
     # dataset
     x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
@@ -213,8 +213,7 @@ if __name__ == "__main__":
     # visualize loss and accuracy during training and validation
     plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
     plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
-    # test best model
-    print('start testing')
+    # draw scatter plot
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
     print('plot result successfully')

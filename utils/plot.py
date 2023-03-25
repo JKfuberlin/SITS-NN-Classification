@@ -29,7 +29,7 @@ def draw_curve(y_train:List[float], y_val:List[float], name:str, method:str, mod
     plt.title(title)
     plt.legend()
     # save figure and clear
-    plt.savefig(f'../outputs/pics/{method}/{title}.jpg')
+    plt.savefig(f'../../outputs/pics/{method}/{title}.jpg')
     plt.clf()
 
 
@@ -41,10 +41,10 @@ def draw_confusion_matrix(ref:pd.DataFrame, pred:pd.DataFrame, classes:List[str]
     # draw figure
     plt.imshow(matrix, interpolation='nearest', cmap=plt.cm.Blues)
     thresh = matrix.max() / 2.
-    for i in range(len(matrix)):    
-        for j in range(len(matrix[i])):    
-            plt.text(j, i, format(matrix[i][j]), 
-                    ha="center", va="center", 
+    for i in range(len(matrix)):
+        for j in range(len(matrix[i])):
+            plt.text(j, i, format(matrix[i][j]),
+                    ha="center", va="center",
                     color="white" if matrix[i, j] >= thresh else "black")
     # set title and label
     indices = range(len(matrix))
@@ -55,7 +55,7 @@ def draw_confusion_matrix(ref:pd.DataFrame, pred:pd.DataFrame, classes:List[str]
     plt.xlabel('Predicted label')
     plt.title(title)
     # save figure and clear
-    plt.savefig('../outputs/pics/classification/'+ title +'.jpg')
+    plt.savefig('../../outputs/pics/classification/'+ title +'.jpg')
     plt.clf()
 
 
@@ -71,7 +71,6 @@ def draw_scatter_plot(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
         plt.subplot(3, 3, i + 1)
         plt.text(0.5, 0.5, f'r2 = {r2:.2f}', fontdict={'weight':'bold', 'size':15}, ha='center')
         plt.scatter(y_pred, y_true, s = 15, c='lightblue')
-        #set title and label
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
         plt.title(header)
@@ -81,8 +80,7 @@ def draw_scatter_plot(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
             plt.xlabel('Prediction')
     # save figure and clear
     title = f'{model} scatter plot'
-    plt.suptitle(title)
-    plt.savefig('../outputs/pics/regression/'+ title +'.jpg')
+    plt.savefig('../../outputs/pics/regression/'+ title +'.jpg')
     plt.clf()
 
 
@@ -103,11 +101,11 @@ def draw_pie_chart(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
         gaps.append(0.05)
     plt.pie(x, labels=labels, explode=gaps, autopct='%.0f%%', textprops={"size":10})
     # set title and legend
-    title = f'{model} true label numbers'
-    plt.title(title)
+    plt.title(f'{model} predicted true labels')
     plt.legend()
     # save figure and clear
-    plt.savefig('../outputs/pics/multi_label/'+ title +'.jpg')
+    title = f'{model} pie chart'
+    plt.savefig('../../outputs/pics/multi_label/'+ title +'.jpg')
     plt.clf()
 
 
@@ -125,10 +123,10 @@ def draw_multi_confusion_matirx(ref:pd.DataFrame, pred:pd.DataFrame, model:str) 
         plt.subplot(3, 3, k + 1)
         plt.imshow(matrix, interpolation='nearest', cmap=plt.cm.Blues)
         thresh = matrix.max() / 2.
-        for i in range(len(matrix)):    
-            for j in range(len(matrix[i])):    
-                plt.text(j, i, format(matrix[i][j]), 
-                        ha="center", va="center", 
+        for i in range(len(matrix)):
+            for j in range(len(matrix[i])):
+                plt.text(j, i, format(matrix[i][j]),
+                        ha="center", va="center",
                         color="white" if matrix[i, j] >= thresh else "black")
         #set title and label
         indices = range(len(matrix))
@@ -142,5 +140,5 @@ def draw_multi_confusion_matirx(ref:pd.DataFrame, pred:pd.DataFrame, model:str) 
     # save figure and clear
     title = f'{model} multi confusion matrix'
     plt.suptitle(title)
-    plt.savefig('../outputs/pics/multi_label/'+ title +'.jpg')
+    plt.savefig('../../outputs/pics/multi_label/'+ title +'.jpg')
     plt.clf()
