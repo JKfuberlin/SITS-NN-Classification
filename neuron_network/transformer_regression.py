@@ -15,11 +15,11 @@ import utils.plot as plot
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
-DATA_DIR = os.path.join(PATH, 'daily_padding')
-LABEL_CSV = '6_classes.csv'
+DATA_DIR = os.path.join(PATH, 'gee', 'output', 'bw_8main_daily_padding')
+LABEL_CSV = '8_main_classes.csv'
 METHOD = 'regression'
 MODEL = 'transformer'
-UID = '6rgr'
+UID = '8rgr'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, LABEL_CSV)
 MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
@@ -73,30 +73,30 @@ def setup_seed(seed:int) -> None:
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
     """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     x_set = torch.from_numpy(x_data)
-    x_set = torch.from_numpy(x_data)
     y_set = torch.from_numpy(y_data).float()
+    # standardization
+    sz, seq = x_set.size(0), x_set.size(1)
+    x_set = x_set.view(-1, num_bands)
+    batch_norm = nn.BatchNorm1d(num_bands)
+    x_set:Tensor = batch_norm(x_set)
+    x_set = x_set.view(sz, seq, num_bands).detach()
     return x_set, y_set
 
 
-def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int)-> Tuple[Data.DataLoader, Data.DataLoader]:
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
     dataset = Data.TensorDataset(x_set, y_set)
     # split dataset
     size = len(dataset)
-    train_size, val_size = round(0.8 * size), round(0.2 * size)
+    train_size, val_size = round(0.8 * size), round(0.1 * size)
+    test_size = size - train_size - val_size
     generator = torch.Generator()
-    train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
-    # # manually split dataset
-    # x_train = x_set[:444]
-    # y_train = y_set[:444]
-    # x_val = x_set[444:]
-    # y_val = y_set[444:]
-    # train_dataset = Data.TensorDataset(x_train, y_train)
-    # val_dataset = Data.TensorDataset(x_val, y_val)
+    train_dataset, val_dataset, test_dataset = Data.random_split(dataset, [train_size, val_size, test_size], generator)
     # data_loader
     train_loader = Data.DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=4)
     val_loader = Data.DataLoader(val_dataset,batch_size=batch_size, shuffle=True,num_workers=4)
-    return train_loader, val_loader
+    test_loader = Data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    return train_loader, val_loader, test_loader
 
 
 def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
@@ -166,7 +166,7 @@ def test(model:nn.Module) -> None:
             y_true += labels.tolist()
             y_pred += outputs.tolist()
         # ***************************change classes here***************************
-        cols = ['Spruce', 'Beech', 'Silver fir', 'Pine', 'Douglas fir', 'Oak', 'Others']
+        cols = ['Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore','Ash', 'Others']
         # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols)
         pred = csv.list_to_dataframe(y_pred, cols)
@@ -184,7 +184,7 @@ if __name__ == "__main__":
     # dataset
     x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
-    train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
+    train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = TransformerRegression(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     save_hyperparameters()

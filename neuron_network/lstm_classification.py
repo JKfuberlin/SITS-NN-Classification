@@ -15,7 +15,7 @@ import utils.plot as plot
 
 # file path
 PATH='D:\\Deutschland\\FUB\\master_thesis\\data'
-DATA_DIR = os.path.join(PATH, 'gee', 'output', 'bw_pure_daily')
+DATA_DIR = os.path.join(PATH, 'gee', 'output', 'bw_pure_daily_padding')
 LABEL_CSV = 'label_7pure.csv'
 METHOD = 'classification'
 MODEL = 'lstm'
@@ -72,21 +72,19 @@ def setup_seed(seed:int) -> None:
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
     """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     # reduce dimention from (n, 1) to (n, )
-    y_data = y_data.reshape(-1)
     x_set = torch.from_numpy(x_data)
     y_set = torch.from_numpy(y_data)
+    # standardization
+    sz, seq = x_set.size(0), x_set.size(1)
+    x_set = x_set.view(-1, num_bands)
+    batch_norm = nn.BatchNorm1d(num_bands)
+    x_set:Tensor = batch_norm(x_set)
+    x_set = x_set.view(sz, seq, num_bands).detach()
     return x_set, y_set
 
 
 def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
-    # # automatically split dataset
-    # dataset = Data.TensorDataset(x_set, y_set)
-    # size = len(dataset)
-    # train_size, val_size = round(0.8 * size), round(0.2 * size)
-    # generator = torch.Generator()
-    # train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
-    # ------------------------------------------------------------------------------------------
     # manually split dataset
     # *******************change number here*******************
     x_train = x_set[:14212]
@@ -111,7 +109,8 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     good_pred = 0
     total = 0
     losses = []
-    for i, (inputs, labels) in enumerate(train_loader):
+    for i, (inputs, refs) in enumerate(train_loader):
+        labels:Tensor = refs[:,1]
         # put the data in gpu
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -141,10 +140,11 @@ def validate(model:nn.Module) -> Tuple[float, float]:
         good_pred = 0
         total = 0
         losses = []
-        for (inputs, labels) in val_loader:
+        for (inputs, refs) in val_loader:
+            labels:Tensor = refs[:,1]
             # put the data in gpu
-            inputs:Tensor = inputs.to(device)
-            labels:Tensor = labels.to(device)
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             # prediction
             outputs:Tensor = model(inputs)
             loss = criterion(outputs, labels)
@@ -167,17 +167,24 @@ def test(model:nn.Module) -> None:
     with torch.no_grad():
         y_true = []
         y_pred = []
-        for (inputs, labels) in test_loader:
-            inputs:Tensor = inputs.to(device)
-            labels:Tensor = labels.to(device)
+        for (inputs, refs) in test_loader:
+            labels:Tensor = refs[:,1]
+            # put the data in gpu
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             outputs:Tensor = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
-            y_true += labels.tolist()
-            y_pred += predicted.tolist()
+            y_true += refs.tolist()
+            refs[:, 1] = predicted
+            y_pred += refs.tolist()
         # *************************change class here*************************
         classes = ['Spruce','Douglas Fir','Pine','Oak','Red Oak','Beech','Sycamore']
         # *******************************************************************
-        plot.draw_confusion_matrix(y_true, y_pred, classes, MODEL_NAME)
+        ref = csv.list_to_dataframe(y_true, ['id', 'class'], False)
+        pred = csv.list_to_dataframe(y_pred, ['id', 'class'], False)
+        csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', True)
+        csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', True)
+        plot.draw_confusion_matrix(ref, pred, classes, MODEL_NAME)
 
 
 
@@ -226,4 +233,4 @@ if __name__ == "__main__":
     print('start testing')
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
-    print('plot results successfully')
+    print('plot result successfully')

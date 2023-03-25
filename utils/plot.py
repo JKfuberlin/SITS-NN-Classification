@@ -33,11 +33,11 @@ def draw_curve(y_train:List[float], y_val:List[float], name:str, method:str, mod
     plt.clf()
 
 
-def draw_confusion_matrix(y_true:List[int], y_pred:List[int], classes:List[str], model:str) -> None:
+def draw_confusion_matrix(ref:pd.DataFrame, pred:pd.DataFrame, classes:List[str], model:str) -> None:
     """Draw consufion matrix to visualise classification result"""
-    assert len(y_pred) == len(y_true), "y_true and y_pred must have the same length"
+    assert len(ref) == len(pred), "y_true and y_pred must have the same length"
     # calculate confusion matrix
-    matrix = confusion_matrix(y_true, y_pred)
+    matrix = confusion_matrix(ref, pred)
     # draw figure
     plt.imshow(matrix, interpolation='nearest', cmap=plt.cm.Blues)
     thresh = matrix.max() / 2.

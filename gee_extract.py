@@ -96,14 +96,15 @@ def get_date(img):
     return img
 
 # add delay to for-loop:
-DELAY = False
+DELAY = True
 STEPS = 3000
-DELAYTIME = 20000 # e.g. 32,400 seconds == 9 hours
+DELAYTIME = 7200 # e.g. 32,400 seconds == 9 hours
 
 extracted = 0
+size = fc.size().getInfo()
 
-for i in range(16000, 19000):
-# for i in range(10000, fc.size().getInfo()):
+# for i in range(86000, 90000):
+for i in range(94000, size):
     extracted = i + 1
     feature = ee.Feature(fc.toList(fc.size()).get(i))
     # info = fc.toList(fc.size()).get(i).getInfo()
@@ -134,7 +135,9 @@ for i in range(16000, 19000):
         fileFormat='CSV').start()
     # GEE can only handle 3000 tasks at once -> add sleep time to avoid overflow
     if DELAY:
-        if (int(i + 1) % int(STEPS)) == 0: # every STEPS steps of for-loop
+        if (int(extracted) % int(STEPS)) == 0: # every STEPS steps of for-loop
+            print(f'task process: {extracted}/{size}')
+            print(f'sleep {DELAYTIME} seconds')
             time.sleep(DELAYTIME)
 
-print(f'task process: {extracted}/{fc.size().getInfo()}')
+print(f'task process: {extracted}/{size}')

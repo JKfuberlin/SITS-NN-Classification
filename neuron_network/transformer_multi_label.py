@@ -14,20 +14,20 @@ import utils.plot as plot
 
 
 # file path
-PATH='D:\\Deutschland\\FUB\\master_thesis\\data\\gee\\output'
-DATA_DIR = os.path.join(PATH, 'daily_padding')
-LABEL_CSV = 'label_multi.csv'
+PATH='D:\\Deutschland\\FUB\\master_thesis\\data'
+DATA_DIR = os.path.join(PATH, 'gee', 'output', 'daily_padding')
+LABEL_CSV = 'label_7multi.csv'
 METHOD = 'multi_label'
 MODEL = 'transformer'
 UID = '7ml'
 MODEL_NAME = MODEL + '_' + UID
-LABEL_PATH = os.path.join(PATH, LABEL_CSV)
+LABEL_PATH = os.path.join(PATH, 'ref', 'part', LABEL_CSV)
 MODEL_PATH = f'../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
 BATCH_SIZE = 128
-LR = 0.001
-EPOCH = 5
+LR = 0.01
+EPOCH = 2
 SEED = 24
 
 # hyperparameters for Transformer model
@@ -73,39 +73,41 @@ def setup_seed(seed:int) -> None:
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
     """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     x_set = torch.from_numpy(x_data)
-    x_set = torch.from_numpy(x_data)
     y_set = torch.from_numpy(y_data).float()
+    # standardization
+    sz, seq = x_set.size(0), x_set.size(1)
+    x_set = x_set.view(-1, num_bands)
+    batch_norm = nn.BatchNorm1d(num_bands)
+    x_set:Tensor = batch_norm(x_set)
+    x_set = x_set.view(sz, seq, num_bands).detach()
     return x_set, y_set
 
 
-def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
     dataset = Data.TensorDataset(x_set, y_set)
     # split dataset
     size = len(dataset)
-    train_size, val_size = round(0.8 * size), round(0.2 * size)
+    train_size, val_size = round(0.8 * size), round(0.1 * size)
+    test_size = size - train_size - val_size
     generator = torch.Generator()
-    train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
-    # # manually split dataset
-    # x_train = x_set[:444]
-    # y_train = y_set[:444]
-    # x_val = x_set[444:]
-    # y_val = y_set[444:]
-    # train_dataset = Data.TensorDataset(x_train, y_train)
-    # val_dataset = Data.TensorDataset(x_val, y_val)
+    train_dataset, val_dataset, test_dataset = Data.random_split(dataset, [train_size, val_size, test_size], generator)
     # data_loader
     train_loader = Data.DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=4)
     val_loader = Data.DataLoader(val_dataset,batch_size=batch_size, shuffle=True,num_workers=4)
-    return train_loader, val_loader
+    test_loader = Data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    return train_loader, val_loader, test_loader
 
 
 def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     model.train()
     accs = []
     losses = []
-    for i, (inputs, labels) in enumerate(train_loader):
+    for i, (inputs, refs) in enumerate(train_loader):
         # exchange dimension 0 and 1 of inputs depending on batch_first or not
         inputs:Tensor = inputs.transpose(0, 1)
+        labels:Tensor = refs[:,1:]
+        # put the data in gpu
         inputs = inputs.to(device)
         labels = labels.to(device)
         # forward pass
@@ -132,9 +134,11 @@ def validate(model:nn.Module) -> Tuple[float, float]:
     accs = []
     losses = []
     with torch.no_grad():
-        for (inputs, labels) in val_loader:
+        for (inputs, refs) in val_loader:
             # exchange dimension 0 and 1 of inputs depending on batch_first or not
             inputs:Tensor = inputs.transpose(0, 1)
+            labels:Tensor = refs[:,1:]
+            # put the data in gpu
             inputs = inputs.to(device)
             labels = labels.to(device)
             # prediction
@@ -158,21 +162,25 @@ def test(model:nn.Module) -> None:
     with torch.no_grad():
         y_true = []
         y_pred = []
-        for (inputs, labels) in val_loader:
+        for (inputs, refs) in test_loader:
+            # exchange dimension 0 and 1 of inputs depending on batch_first or not
             inputs:Tensor = inputs.transpose(0, 1)
+            labels:Tensor = refs[:,1:]
+            # put the data in gpu
             inputs = inputs.to(device)
-            labels:Tensor = labels.to(device)
+            labels = labels.to(device)
             outputs:Tensor = model(inputs)
             predicted = torch.where(outputs >= 0.5, 1, 0)
-            y_true += labels.tolist()
-            y_pred += predicted.tolist()
+            y_true += refs.tolist()
+            refs[:, 1:] = predicted
+            y_pred += refs.tolist()
         # ***************************change classes here***************************
-        cols = ['Spruce', 'Beech', 'Silver fir', 'Pine', 'Douglas fir', 'Oak', 'Sycamore']
+        cols = ['id','Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore']
         # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols, False)
         pred = csv.list_to_dataframe(y_pred, cols, False)
-        csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', False)
-        csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', False)
+        csv.export(ref, f'../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', True)
+        csv.export(pred, f'../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', True)
         plot.draw_pie_chart(ref, pred, MODEL_NAME)
         plot.draw_multi_confusion_matirx(ref, pred, MODEL_NAME)
 
@@ -186,15 +194,15 @@ if __name__ == "__main__":
     # dataset
     x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
-    train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
+    train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = TransformerMultiLabel(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     save_hyperparameters()
     # loss and optimizer
     # ******************change weight here******************
-    weight = torch.tensor([1., 1., 1., 1., 1.1, 1.1])
+    # weight = torch.tensor([1., 1., 1., 1., 1.1, 1.1])
     # ******************************************************
-    criterion = nn.BCELoss(weight=weight).to(device)
+    criterion = nn.BCELoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
     # evaluate terms
     train_epoch_loss = []
