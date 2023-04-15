@@ -16,10 +16,10 @@ import utils.plot as plot
 # file path
 PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'bw_8main_daily_padding')
-LABEL_CSV = 'label_8multi.csv'
+LABEL_CSV = 'label_7multi5.csv'
 METHOD = 'multi_label'
 MODEL = 'transformer'
-UID = '8ml'
+UID = '7ml5'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, 'ref', 'all',LABEL_CSV)
 MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
@@ -32,7 +32,7 @@ SEED = 24
 
 # hyperparameters for Transformer model
 num_bands = 10
-num_classes = 8
+num_classes = 7
 d_model = 128
 nhead = 8
 num_layers = 2
@@ -175,7 +175,7 @@ def test(model:nn.Module) -> None:
             refs[:, 1:] = predicted
             y_pred += refs.tolist()
         # ***************************change classes here***************************
-        cols = ['id','Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore','Ash']
+        cols = ['id','Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore']
         # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols, False)
         pred = csv.list_to_dataframe(y_pred, cols, False)

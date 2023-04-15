@@ -16,10 +16,10 @@ import utils.plot as plot
 # file path
 PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'bw_pure_daily_padding')
-LABEL_CSV = 'label_8pure.csv'
+LABEL_CSV = 'label_8pure_mix.csv'
 METHOD = 'classification'
-MODEL = 'lstm'
-UID = '8pure'
+MODEL = 'bi-lstm'
+UID = '8pure9'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, 'ref', 'all', LABEL_CSV)
 MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
@@ -35,8 +35,8 @@ num_bands = 10
 input_size = 64
 hidden_size = 128
 num_layers = 3
-num_classes = 8
-bidirectional = False
+num_classes = 9
+bidirectional = True
 
 
 def setup_seed(seed:int) -> None:
@@ -94,12 +94,12 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.D
     # ------------------------------------------------------------------------------------------
     # manually split dataset
     # *******************change number here*******************
-    x_train = x_set[:14813]
-    y_train = y_set[:14813]
-    x_val = x_set[14813: 16663]
-    y_val = y_set[14813: 16663]
-    x_test = x_set[16663:]
-    y_test = y_set[16663:]
+    x_train = x_set[:15669]
+    y_train = y_set[:15669]
+    x_val = x_set[15669: 17626]
+    y_val = y_set[15669: 17626]
+    x_test = x_set[17626:]
+    y_test = y_set[17626:]
     # ******************************************************
     train_dataset = Data.TensorDataset(x_train, y_train)
     val_dataset = Data.TensorDataset(x_val, y_val)
@@ -185,7 +185,7 @@ def test(model:nn.Module) -> None:
             refs[:, 1] = predicted
             y_pred += refs.tolist()
         # *************************change class here*************************
-        classes = ['Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Red Oak','Beech','Sycamore']
+        classes = ['Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Red Oak','Beech','Sycamore','Others']
         # *******************************************************************
         ref = csv.list_to_dataframe(y_true, ['id', 'class'], False)
         pred = csv.list_to_dataframe(y_pred, ['id', 'class'], False)
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     save_hyperparameters()
     # loss and optimizer
     # ******************change weight here******************
-    samples = torch.tensor([24106/5, 751, 3413, 1345, 2019, 1199, 8010/2, 964])
+    samples = torch.tensor([24106/5, 751, 3413, 1345, 2019, 1199, 8010/2, 964, 4280/4])
     weight = 1 / samples
     # ******************************************************
     criterion = nn.CrossEntropyLoss(weight=weight).to(device)
