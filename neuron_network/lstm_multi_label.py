@@ -168,7 +168,7 @@ def test(model:nn.Module) -> None:
             refs[:, 1:] = predicted
             y_pred += refs.tolist()
         # ***************************change classes here***************************
-        cols = ['id','Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore','Ash']
+        cols = ['id','Spruce','Silver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore','Ash']
         # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols, False)
         pred = csv.list_to_dataframe(y_pred, cols, False)

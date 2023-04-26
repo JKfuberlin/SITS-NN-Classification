@@ -15,15 +15,15 @@ from models.lstm import LSTMClassifier
 
 # file path
 PATH='/home/admin/dongshen/data'
-DATA_DIR = os.path.join(PATH, 'gee', 'validation_grid_daily_padding')
-LABEL_CSV = 'label_val_grid.csv'
+DATA_DIR = os.path.join(PATH, 'gee', 'aoi_daily_padding')
+LABEL_CSV = 'label_aoi.csv'
 METHOD = 'classification'
 MODEL = 'lstm'
 UID = '8pure9'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH,'ref', 'validation', LABEL_CSV)
 MODEL_PATH = f'../../outputs/models/{METHOD}/01/{MODEL_NAME}.pth'
-SHP_PATH = os.path.join(PATH,'shp', 'wgs_validation_grid_20m.shp')
+SHP_PATH = os.path.join(PATH,'shp', 'aoi_polygons.shp')
 
 
 # hyperparameters for LSTM
@@ -67,17 +67,17 @@ def predict(dataloader:Data.DataLoader, model:nn.Module) -> pd.DataFrame:
             y_list += refs.tolist()
     cols = ['id', 'class']
     pred = csv.list_to_dataframe(y_list, cols, False)
-    csv.export(pred, f'../../outputs/csv/map/{MODEL_NAME}_pred.csv', True)
+    csv.export(pred, f'../../outputs/csv/map/{METHOD}/{MODEL_NAME}_pred.csv', True)
     return pred
 
 
 def map_class(pred:pd.DataFrame, gdf:gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """map class info to shp file"""
     # *****************change id column here*****************
-    gdf.rename(columns={'fid':'id'}, inplace=True)
+    # gdf.rename(columns={'fid':'id'}, inplace=True)
     # *******************************************************
     output = pd.merge(gdf, pred, on='id', how='inner')
-    class_name = {0:'Spruce', 1:'Sliver Fir', 2:'Douglas Fir', 3:'Pine', 
+    class_name = {0:'Spruce', 1:'Silver Fir', 2:'Douglas Fir', 3:'Pine', 
                   4:'Oak', 5:'Red Oak', 6:'Beech', 7:'Sycamore', 8:'Others'}
     output['name'] = output['class'].map(class_name)
     return output
@@ -85,20 +85,17 @@ def map_class(pred:pd.DataFrame, gdf:gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 def validation_map(gdf:gpd.GeoDataFrame) -> None:
     """Draw validation map for 3 sub areas"""
-    areas = []
-    # top area: bottom > 2850000
-    sub_area1 = gdf[gdf['top'] > 2850000]
-    areas.append(sub_area1)
-    # middle area: 2800000 < bottom < 2850000
-    sub_area2 = gdf[(gdf['top'] < 2850000) & (gdf['top'] > 2800000)]
-    areas.append(sub_area2)
-    # bottoem area: bottom < 2800000
-    sub_area3 = gdf[gdf['top'] < 2800000]
-    areas.append(sub_area3)
+    # Karlsruhe
+    aoi_1 = gdf[gdf['Location'] == 'Hardtwald_pine_beech_redoak']
+    # Stuttgart
+    aoi_2 = gdf[gdf['Location'] == 'schoenbuch_beech_oak_mixture']
+    # Freiburg
+    aoi_3 = gdf[gdf['Location'] == 'Schwarzwald_spruce_silverfir_douglasfir']
+    # dict of aoi
+    areas = {'Hardtwald':aoi_1, 'Schoenbuch':aoi_2, 'Schwarzwald':aoi_3}
     # draw map
-    for i in range(3):
-        sub = f'sub_area{i+1}'
-        plot.draw_map(areas[i], sub, MODEL_NAME)
+    for aoi, gdf in areas.items():
+        plot.draw_map(gdf, aoi, MODEL_NAME)
     print('generate map successfully')
 
 

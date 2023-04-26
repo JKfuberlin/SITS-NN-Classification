@@ -153,7 +153,7 @@ def draw_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     # map class and color
     color_map = {
         'Spruce': '#1f77b4', 
-        'Sliver Fir': '#ff7f0e', 
+        'Silver Fir': '#ff7f0e', 
         'Douglas Fir': '#2ca02c', 
         'Pine': '#d62728', 
         'Oak': '#9467bd', 
@@ -174,5 +174,5 @@ def draw_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     ax.set_title(title)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    plt.savefig(f'../../outputs/pics/map/'+ title +'.jpg')
+    plt.savefig(f'../../outputs/pics/map/classification/'+ title +'.jpg')
     plt.clf()

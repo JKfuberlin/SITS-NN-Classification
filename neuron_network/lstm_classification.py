@@ -16,7 +16,7 @@ import utils.plot as plot
 # file path
 PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'bw_pure_daily_padding')
-LABEL_CSV = 'label_8pure_mix.csv'
+LABEL_CSV = 'label_8pure9.csv'
 METHOD = 'classification'
 MODEL = 'bi-lstm'
 UID = '8pure9'
@@ -27,7 +27,7 @@ MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 # general hyperparameters
 BATCH_SIZE = 512
 LR = 0.001
-EPOCH = 200
+EPOCH = 150
 SEED = 24
 
 # hyperparameters for LSTM
@@ -85,21 +85,14 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tenso
 
 def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
-    # # automatically split dataset
-    # dataset = Data.TensorDataset(x_set, y_set)
-    # size = len(dataset)
-    # train_size, val_size = round(0.8 * size), round(0.2 * size)
-    # generator = torch.Generator()
-    # train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
-    # ------------------------------------------------------------------------------------------
     # manually split dataset
     # *******************change number here*******************
-    x_train = x_set[:15669]
-    y_train = y_set[:15669]
-    x_val = x_set[15669: 17626]
-    y_val = y_set[15669: 17626]
-    x_test = x_set[17626:]
-    y_test = y_set[17626:]
+    x_train = x_set[:15629]
+    y_train = y_set[:15629]
+    x_val = x_set[15629: 17584]
+    y_val = y_set[15629: 17584]
+    x_test = x_set[17584:]
+    y_test = y_set[17584:]
     # ******************************************************
     train_dataset = Data.TensorDataset(x_train, y_train)
     val_dataset = Data.TensorDataset(x_val, y_val)
@@ -185,7 +178,7 @@ def test(model:nn.Module) -> None:
             refs[:, 1] = predicted
             y_pred += refs.tolist()
         # *************************change class here*************************
-        classes = ['Spruce','Sliver Fir','Douglas Fir','Pine','Oak','Red Oak','Beech','Sycamore','Others']
+        classes = ['Spruce','Silver Fir','Douglas Fir','Pine','Oak','Red Oak','Beech','Sycamore','Others']
         # *******************************************************************
         ref = csv.list_to_dataframe(y_true, ['id', 'class'], False)
         pred = csv.list_to_dataframe(y_pred, ['id', 'class'], False)
@@ -209,7 +202,7 @@ if __name__ == "__main__":
     save_hyperparameters()
     # loss and optimizer
     # ******************change weight here******************
-    samples = torch.tensor([24106/5, 751, 3413, 1345, 2019, 1199, 8010/2, 964, 4280/4])
+    samples = torch.tensor([24099//5, 750, 3407, 1316, 2018, 1198, 7997//2, 960, 4277//4])
     weight = 1 / samples
     # ******************************************************
     criterion = nn.CrossEntropyLoss(weight=weight).to(device)
