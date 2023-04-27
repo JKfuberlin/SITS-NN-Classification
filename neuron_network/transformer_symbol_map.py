@@ -10,36 +10,36 @@ sys.path.append('../')
 import utils.csv as csv
 import utils.shp as shp
 import utils.plot as plot
-from models.lstm import LSTMClassifier
+from models.transformer import TransformerClassifier
 
 
 # file path
 PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'aoi_daily_padding')
-LABEL_CSV = 'label_aoi.csv'
-METHOD = 'classification'
-MODEL = 'lstm'
-UID = '8pure9'
+LABEL_CSV = 'multi_aoi.csv'
+METHOD = 'multi_label'
+MODEL = 'transformer'
+UID = '7ml25'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH,'ref', 'validation', LABEL_CSV)
-MODEL_PATH = f'../../outputs/models/{METHOD}/01/{MODEL_NAME}.pth'
+MODEL_PATH = f'../../outputs/models/{METHOD}/06/{MODEL_NAME}.pth'
 SHP_PATH = os.path.join(PATH,'shp', 'aoi_polygons.shp')
 
 
 # hyperparameters for LSTM
 num_bands = 10
-input_size = 64
-hidden_size = 128
-num_layers = 3
-num_classes = 9
-bidirectional = False
+num_classes = 7
+d_model = 128
+nhead = 8
+num_layers = 2
+dim_feedforward = 512
 
 
 def build_dataloader(x_data:np.ndarray, y_data:np.ndarray) -> Data.DataLoader:
     """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     # reduce dimention from (n, 1) to (n, )
     x_set = torch.from_numpy(x_data)
-    y_set = torch.from_numpy(y_data)
+    y_set = torch.from_numpy(y_data).float()
     # standardization
     sz, seq = x_set.size(0), x_set.size(1)
     x_set = x_set.view(-1, num_bands)
@@ -58,14 +58,15 @@ def predict(dataloader:Data.DataLoader, model:nn.Module) -> pd.DataFrame:
     with torch.no_grad():
         y_list = []
         for (inputs, refs) in dataloader:
-            inputs:Tensor = inputs.to(device)
+            inputs:Tensor = inputs.transpose(0, 1)
+            inputs = inputs.to(device)
             outputs:Tensor = model(inputs)
-            # transfer prediction to class index
-            _, predicted = torch.max(outputs.data, 1)
-            refs[:, 1] = predicted
+            # transfer prediction to multi-label
+            predicted = torch.where(outputs >= 0.5, 1, 0)
+            refs[:, 1:] = predicted
             # export as Dataframe
             y_list += refs.tolist()
-    cols = ['id', 'class']
+    cols = ['id','Spruce','Silver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore']
     pred = csv.list_to_dataframe(y_list, cols, False)
     csv.export(pred, f'../../outputs/csv/map/{METHOD}/{MODEL_NAME}_pred.csv', True)
     return pred
@@ -73,13 +74,7 @@ def predict(dataloader:Data.DataLoader, model:nn.Module) -> pd.DataFrame:
 
 def map_class(pred:pd.DataFrame, gdf:gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """map class info to shp file"""
-    # *****************change id column here*****************
-    # gdf.rename(columns={'fid':'id'}, inplace=True)
-    # *******************************************************
     output = pd.merge(gdf, pred, on='id', how='inner')
-    class_name = {0:'Spruce', 1:'Silver Fir', 2:'Douglas Fir', 3:'Pine', 
-                  4:'Oak', 5:'Red Oak', 6:'Beech', 7:'Sycamore', 8:'Others'}
-    output['name'] = output['class'].map(class_name)
     return output
 
 
@@ -95,7 +90,7 @@ def validation_map(gdf:gpd.GeoDataFrame) -> None:
     areas = {'Hardtwald':aoi_1, 'Schoenbuch':aoi_2, 'Schwarzwald':aoi_3}
     # draw map
     for aoi, gdf in areas.items():
-        plot.draw_map(gdf, aoi, MODEL_NAME)
+        plot.draw_symbol_map(gdf, aoi, MODEL_NAME)
     print('generate map successfully')
 
 
@@ -107,7 +102,7 @@ if __name__ == '__main__':
     x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     dataloader = build_dataloader(x_data, y_data)
     # model
-    model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
+    model = TransformerClassifier(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     model.load_state_dict(torch.load(MODEL_PATH))
     # make prediction
     print('start predicting')

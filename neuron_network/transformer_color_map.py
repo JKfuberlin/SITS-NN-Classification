@@ -22,7 +22,7 @@ MODEL = 'transformer'
 UID = '8pure9'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH,'ref', 'validation', LABEL_CSV)
-MODEL_PATH = f'../../outputs/models/{METHOD}/01/{MODEL_NAME}.pth'
+MODEL_PATH = f'../../outputs/models/{METHOD}/02/{MODEL_NAME}.pth'
 SHP_PATH = os.path.join(PATH,'shp', 'aoi_polygons.shp')
 
 
@@ -96,7 +96,7 @@ def validation_map(gdf:gpd.GeoDataFrame) -> None:
     areas = {'Hardtwald':aoi_1, 'Schoenbuch':aoi_2, 'Schwarzwald':aoi_3}
     # draw map
     for aoi, gdf in areas.items():
-        plot.draw_map(gdf, aoi, MODEL_NAME)
+        plot.draw_color_map(gdf, aoi, MODEL_NAME)
     print('generate map successfully')
 
 

@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt 
+import numpy as np
 from matplotlib.ticker import MaxNLocator
 from sklearn.metrics import confusion_matrix, r2_score
 import pandas as pd
@@ -146,7 +147,7 @@ def draw_multi_confusion_matirx(ref:pd.DataFrame, pred:pd.DataFrame, model:str) 
     plt.clf()
 
 
-def draw_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
+def draw_color_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     """Draw validation map to visulise classification result"""
     # Create a figure and axis
     fig, ax = plt.subplots(figsize=(9, 6))
@@ -170,9 +171,72 @@ def draw_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     handles = [plt.Line2D([], [], color=color_map[label], marker='o', linestyle='', label=label) for label in legend_labels]
     ax.legend(handles=handles, labels=legend_labels, loc='center left', bbox_to_anchor=(1.0, 0.5))
     # Set the title and axis labels
-    title = f'Validation Map of {model} for {area}'
+    title = f'Color Map of {model} for {area}'
     ax.set_title(title)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     plt.savefig(f'../../outputs/pics/map/classification/'+ title +'.jpg')
     plt.clf()
+
+
+def draw_symbol_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
+    """Draw validation map to visulise multi-label result"""
+    fig, ax = plt.subplots(figsize=(9, 6))
+    # tree species
+    labels = ['Spruce', 'Silver Fir', 'Douglas Fir', 'Pine', 'Oak', 'Beech', 'Sycamore']
+    # marker shape and color
+    shape_map = {
+                    'Spruce':'o',
+                    'Silver Fir':'s',
+                    'Douglas Fir':'^',
+                    'Pine':'v', 
+                    'Oak':'p',
+                    'Beech':'h', 
+                    'Sycamore':'X'
+                    }
+    color_map = {
+                    'Spruce':'#1f77b4',
+                    'Silver Fir':'#ff7f0e',
+                    'Douglas Fir':'#2ca02c',
+                    'Pine':'#d62728', 
+                    'Oak':'#9467bd',
+                    'Beech':'#e377c2', 
+                    'Sycamore':'#7f7f7f'
+                    }
+    # plot polygon boundary
+    gdf.boundary.plot(ax=ax, color='gray', linewidth=1)
+    # plot symbol
+    gdf.apply(lambda row: _plot_symbol(row, ax, labels, shape_map, color_map), axis=1)
+    # set legend
+    handles = [plt.Line2D([], [], color=color_map[label], marker=shape_map[label], linestyle='', label=label) for label in labels]
+    ax.legend(handles=handles, labels=labels, loc='center left', bbox_to_anchor=(1.0, 0.5))
+    # Set the title and axis labels
+    title = f'Symbol Map of {model} for {area}'
+    ax.set_title(title)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    plt.savefig(f'../../outputs/pics/map/multi_label/'+ title +'.jpg')
+    plt.clf()
+
+
+def _plot_symbol(row, ax, tree_types:list, marker_shapes:dict, marker_colors:dict, radius_scale=0.5) -> None:
+    """plot symbol for each label"""
+    # find polygons center
+    centroid = row['geometry'].centroid
+    # sybmol angle and radius
+    num_trees = row[tree_types].sum()
+    if num_trees == 0:
+        return
+    angle_step = 2 * np.pi / num_trees
+    radius = row['geometry'].area ** 0.5 / 4 * radius_scale
+    angle = 0
+    # iteration for each class
+    for tree_type in tree_types:
+        if row[tree_type]:
+            # symbol coordinate
+            x = centroid.x + radius * np.cos(angle)
+            y = centroid.y + radius * np.sin(angle)
+            # plot
+            ax.plot(x, y, marker=marker_shapes[tree_type], color=marker_colors[tree_type], markersize=8, markeredgewidth=1, markeredgecolor='black')
+            # update angle
+            angle += angle_step
