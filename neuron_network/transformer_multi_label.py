@@ -8,7 +8,7 @@ import sys
 import json
 sys.path.append('../')
 import utils.csv as csv
-from models.transformer import TransformerMultiLabel
+from models.transformer import TransformerClassifier
 import utils.validation as val
 import utils.plot as plot
 
@@ -16,10 +16,10 @@ import utils.plot as plot
 # file path
 PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'bw_8main_daily_padding')
-LABEL_CSV = 'label_7multi5.csv'
+LABEL_CSV = 'label_7multi20.csv'
 METHOD = 'multi_label'
 MODEL = 'transformer'
-UID = '7ml5'
+UID = '7ml20'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, 'ref', 'all',LABEL_CSV)
 MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
@@ -114,6 +114,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         # recording training accuracy
+        outputs = sigmoid(outputs)
         accs.append(val.multi_label_acc(labels, outputs))
         # record training loss
         losses.append(loss.item())
@@ -145,6 +146,7 @@ def validate(model:nn.Module) -> Tuple[float, float]:
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             # recording validation accuracy
+            outputs = sigmoid(outputs)
             accs.append(val.multi_label_acc(labels, outputs))
             # record validation loss
             losses.append(loss.item())
@@ -169,7 +171,9 @@ def test(model:nn.Module) -> None:
             # put the data in gpu
             inputs = inputs.to(device)
             labels = labels.to(device)
+            # prediction
             outputs:Tensor = model(inputs)
+            outputs = sigmoid(outputs)
             predicted = torch.where(outputs >= 0.5, 1, 0)
             y_true += refs.tolist()
             refs[:, 1:] = predicted
@@ -196,14 +200,17 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
-    model = TransformerMultiLabel(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
+    model = TransformerClassifier(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     save_hyperparameters()
     # loss and optimizer
     # ******************change weight here******************
-    # weight = torch.tensor([1., 1., 1., 1., 1.1, 1.1])
+    # num_positive = torch.tensor([28114, 19377, 8625, 6530, 2862, 19012, 2457], dtype=torch.float)
+    # num_negative = torch.tensor([24362, 33099, 43851, 45946, 49614, 33464, 50019], dtype=torch.float)
+    # pos_weight = num_positive / (num_positive + num_negative)
     # ******************************************************
-    criterion = nn.BCELoss().to(device)
+    criterion = nn.BCEWithLogitsLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
+    sigmoid = nn.Sigmoid().to(device)
     # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []

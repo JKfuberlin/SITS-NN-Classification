@@ -18,7 +18,7 @@ PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'bw_pure_daily_padding')
 LABEL_CSV = 'label_8pure9.csv'
 METHOD = 'classification'
-MODEL = 'bi-lstm'
+MODEL = 'lstm'
 UID = '8pure9'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, 'ref', 'all', LABEL_CSV)
@@ -27,7 +27,7 @@ MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 # general hyperparameters
 BATCH_SIZE = 512
 LR = 0.001
-EPOCH = 150
+EPOCH = 100
 SEED = 24
 
 # hyperparameters for LSTM
@@ -36,7 +36,7 @@ input_size = 64
 hidden_size = 128
 num_layers = 3
 num_classes = 9
-bidirectional = True
+bidirectional = False
 
 
 def setup_seed(seed:int) -> None:
@@ -118,6 +118,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         # recording training accuracy
+        outputs = softmax(outputs)
         good_pred += val.true_pred_num(labels, outputs)
         total += labels.size(0)
         # record training loss
@@ -149,6 +150,7 @@ def validate(model:nn.Module) -> Tuple[float, float]:
             outputs:Tensor = model(inputs)
             loss = criterion(outputs, labels)
             # recording validation accuracy
+            outputs = softmax(outputs)
             good_pred += val.true_pred_num(labels, outputs)
             total += labels.size(0)
             # record validation loss
@@ -172,7 +174,9 @@ def test(model:nn.Module) -> None:
             # put the data in gpu
             inputs = inputs.to(device)
             labels = labels.to(device)
+            # prediction
             outputs:Tensor = model(inputs)
+            outputs = softmax(outputs)
             _, predicted = torch.max(outputs.data, 1)
             y_true += refs.tolist()
             refs[:, 1] = predicted
@@ -207,6 +211,7 @@ if __name__ == "__main__":
     # ******************************************************
     criterion = nn.CrossEntropyLoss(weight=weight).to(device)
     optimizer = optim.Adam(model.parameters(), LR)
+    softmax = nn.Softmax(dim=1).to(device)
     # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []

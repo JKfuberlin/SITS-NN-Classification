@@ -8,7 +8,7 @@ import sys
 import json
 sys.path.append('../')
 import utils.csv as csv
-from models.lstm import LSTMMultiLabel
+from models.lstm import LSTMClassifier
 import utils.validation as val
 import utils.plot as plot
 
@@ -16,10 +16,10 @@ import utils.plot as plot
 # file path
 PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'bw_8main_daily_padding')
-LABEL_CSV = 'label_8multi.csv'
+LABEL_CSV = 'label_7multi20.csv'
 METHOD = 'multi_label'
 MODEL = 'bi-lstm'
-UID = '8ml'
+UID = '7ml20'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, 'ref', 'all',LABEL_CSV)
 MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
@@ -35,7 +35,7 @@ num_bands = 10
 input_size = 64
 hidden_size = 128
 num_layers = 3
-num_classes = 8
+num_classes = 7
 bidrectional = True
 
 
@@ -111,6 +111,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         # recording training accuracy
+        outputs = sigmoid(outputs)
         accs.append(val.multi_label_acc(labels, outputs))
         # record training loss
         losses.append(loss.item())
@@ -140,6 +141,7 @@ def validate(model:nn.Module) -> Tuple[float, float]:
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             # recording validation accuracy
+            outputs = sigmoid(outputs)
             accs.append(val.multi_label_acc(labels, outputs))
             # record validation loss
             losses.append(loss.item())
@@ -162,13 +164,15 @@ def test(model:nn.Module) -> None:
             # put the data in gpu
             inputs = inputs.to(device)
             labels = labels.to(device)
+            # prediction
             outputs:Tensor = model(inputs)
+            outputs = sigmoid(outputs)
             predicted = torch.where(outputs >= 0.5, 1, 0)
             y_true += refs.tolist()
             refs[:, 1:] = predicted
             y_pred += refs.tolist()
         # ***************************change classes here***************************
-        cols = ['id','Spruce','Silver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore','Ash']
+        cols = ['id','Spruce','Silver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore']
         # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols, False)
         pred = csv.list_to_dataframe(y_pred, cols, False)
@@ -189,14 +193,17 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
-    model = LSTMMultiLabel(num_bands, input_size, hidden_size, num_layers, num_classes, bidrectional).to(device)
+    model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidrectional).to(device)
     save_hyperparameters()
     # loss and optimizer
     # ******************change weight here******************
-    # weight = torch.tensor([1., 1., 1., 1., 1.1, 1.1])
+    # num_positive = torch.tensor([28114, 19377, 8625, 6530, 2862, 19012, 2457], dtype=torch.float)
+    # num_negative = torch.tensor([24362, 33099, 43851, 45946, 49614, 33464, 50019], dtype=torch.float)
+    # pos_weight = num_positive / (num_positive + num_negative)
     # ******************************************************
-    criterion = nn.BCELoss().to(device)
+    criterion = nn.BCEWithLogitsLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
+    sigmoid = nn.Sigmoid().to(device)
     # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []
@@ -219,7 +226,7 @@ if __name__ == "__main__":
     # visualize loss and accuracy during training and validation
     plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
     plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
-    # draw scatter plot
+    # test best model
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
     print('plot result successfully')

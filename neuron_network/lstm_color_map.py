@@ -18,11 +18,11 @@ PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'aoi_daily_padding')
 LABEL_CSV = 'label_aoi.csv'
 METHOD = 'classification'
-MODEL = 'bi-lstm'
+MODEL = 'lstm'
 UID = '8pure9'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH,'ref', 'validation', LABEL_CSV)
-MODEL_PATH = f'../../outputs/models/{METHOD}/02/{MODEL_NAME}.pth'
+MODEL_PATH = f'../../outputs/models/{METHOD}/03/{MODEL_NAME}.pth'
 SHP_PATH = os.path.join(PATH,'shp', 'aoi_polygons.shp')
 
 
@@ -32,7 +32,7 @@ input_size = 64
 hidden_size = 128
 num_layers = 3
 num_classes = 9
-bidirectional = True
+bidirectional = False
 
 
 def build_dataloader(x_data:np.ndarray, y_data:np.ndarray) -> Data.DataLoader:
@@ -59,7 +59,10 @@ def predict(dataloader:Data.DataLoader, model:nn.Module) -> pd.DataFrame:
         y_list = []
         for (inputs, refs) in dataloader:
             inputs:Tensor = inputs.to(device)
+            softmax = nn.Softmax(dim=1).to(device)
+            # prediction
             outputs:Tensor = model(inputs)
+            outputs = softmax(outputs)
             # transfer prediction to class index
             _, predicted = torch.max(outputs.data, 1)
             refs[:, 1] = predicted

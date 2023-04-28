@@ -19,8 +19,7 @@ class LSTMClassifier(nn.Module):
                     nn.ReLU(),
                     nn.BatchNorm1d(256),
                     nn.Dropout(0.3),
-                    nn.Linear(256, num_classes),
-                    nn.Softmax(dim=1)
+                    nn.Linear(256, num_classes)
                 )
 
     def forward(self, x:Tensor):

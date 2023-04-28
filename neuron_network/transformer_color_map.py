@@ -22,7 +22,7 @@ MODEL = 'transformer'
 UID = '8pure9'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH,'ref', 'validation', LABEL_CSV)
-MODEL_PATH = f'../../outputs/models/{METHOD}/02/{MODEL_NAME}.pth'
+MODEL_PATH = f'../../outputs/models/{METHOD}/03/{MODEL_NAME}.pth'
 SHP_PATH = os.path.join(PATH,'shp', 'aoi_polygons.shp')
 
 
@@ -60,7 +60,10 @@ def predict(dataloader:Data.DataLoader, model:nn.Module) -> pd.DataFrame:
         for (inputs, refs) in dataloader:
             inputs:Tensor = inputs.transpose(0, 1)
             inputs = inputs.to(device)
+            softmax = nn.Softmax(dim=1).to(device)
+            # prediction
             outputs:Tensor = model(inputs)
+            outputs = softmax(outputs)
             # transfer prediction to class index
             _, predicted = torch.max(outputs.data, 1)
             refs[:, 1] = predicted

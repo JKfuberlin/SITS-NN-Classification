@@ -50,9 +50,11 @@ def true_pred_num(labels: Tensor, outputs:Tensor) -> int:
     return num
 
 
-def multi_label_acc(y_true:Tensor, y_pred:Tensor) -> float:
+def multi_label_acc(labels:Tensor, outputs:Tensor) -> float:
     """Return total correct prediction number of multi-label for each batch"""
-    assert y_true.size() == y_pred.size(), "Size of outputs and labels should be equal"
-    mla = MultilabelAccuracy(num_labels=y_true.size(1)).to(device)
-    acc = mla(y_pred, y_true).item()
+    assert labels.size() == outputs.size(), "Size of outputs and labels should be equal"
+    num = labels.size(0)
+    predicted = torch.where(outputs >= 0.5, 1, 0)
+    eq = torch.all(labels==predicted, dim=1).sum().item()
+    acc = eq / num
     return acc
