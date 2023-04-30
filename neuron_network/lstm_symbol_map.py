@@ -18,21 +18,21 @@ PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'aoi_daily_padding')
 LABEL_CSV = 'multi_aoi.csv'
 METHOD = 'multi_label'
-MODEL = 'lstm'
+MODEL = 'bi-lstm'
 UID = '7ml20'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH,'ref', 'validation', LABEL_CSV)
-MODEL_PATH = f'../../outputs/models/{METHOD}/02/{MODEL_NAME}.pth'
+MODEL_PATH = f'../../outputs/models/{METHOD}/04/{MODEL_NAME}.pth'
 SHP_PATH = os.path.join(PATH,'shp', 'aoi_polygons.shp')
 
 
 # hyperparameters for LSTM
 num_bands = 10
-input_size = 64
-hidden_size = 128
+input_size = 128
+hidden_size = 64
 num_layers = 3
 num_classes = 7
-bidirectional = False
+bidirectional = True
 
 
 def build_dataloader(x_data:np.ndarray, y_data:np.ndarray) -> Data.DataLoader:

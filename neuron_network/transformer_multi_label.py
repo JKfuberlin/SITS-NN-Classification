@@ -27,8 +27,8 @@ MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 # general hyperparameters
 BATCH_SIZE = 512
 LR = 0.001
-EPOCH = 100
-SEED = 24
+EPOCH = 50
+SEED = 8
 
 # hyperparameters for Transformer model
 num_bands = 10
@@ -206,7 +206,7 @@ if __name__ == "__main__":
     # ******************change weight here******************
     # num_positive = torch.tensor([28114, 19377, 8625, 6530, 2862, 19012, 2457], dtype=torch.float)
     # num_negative = torch.tensor([24362, 33099, 43851, 45946, 49614, 33464, 50019], dtype=torch.float)
-    # pos_weight = num_positive / (num_positive + num_negative)
+    # pos_weight = num_negative / num_positive
     # ******************************************************
     criterion = nn.BCEWithLogitsLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)

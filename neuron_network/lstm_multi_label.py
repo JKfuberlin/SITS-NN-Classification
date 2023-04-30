@@ -27,16 +27,16 @@ MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 # general hyperparameters
 BATCH_SIZE = 512
 LR = 0.001
-EPOCH = 100
-SEED = 24
+EPOCH = 50
+SEED = 8
 
 # hyperparameters for LSTM
 num_bands = 10
-input_size = 64
-hidden_size = 128
+input_size = 128
+hidden_size = 64
 num_layers = 3
 num_classes = 7
-bidrectional = True
+bidirectional = True
 
 
 def setup_seed(seed:int) -> None:
@@ -193,13 +193,13 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
-    model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidrectional).to(device)
+    model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
     save_hyperparameters()
     # loss and optimizer
     # ******************change weight here******************
     # num_positive = torch.tensor([28114, 19377, 8625, 6530, 2862, 19012, 2457], dtype=torch.float)
     # num_negative = torch.tensor([24362, 33099, 43851, 45946, 49614, 33464, 50019], dtype=torch.float)
-    # pos_weight = num_positive / (num_positive + num_negative)
+    # pos_weight = num_negative / num_positive
     # ******************************************************
     criterion = nn.BCEWithLogitsLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)

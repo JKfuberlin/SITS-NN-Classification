@@ -150,7 +150,7 @@ def draw_multi_confusion_matirx(ref:pd.DataFrame, pred:pd.DataFrame, model:str) 
 def draw_color_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     """Draw validation map to visulise classification result"""
     # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(9, 6))
+    fig, ax = plt.subplots(figsize=(12, 8))
     # map class and color
     color_map = {
         'Spruce': '#1f77b4', 
@@ -181,7 +181,7 @@ def draw_color_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
 
 def draw_symbol_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     """Draw validation map to visulise multi-label result"""
-    fig, ax = plt.subplots(figsize=(9, 6))
+    fig, ax = plt.subplots(figsize=(12, 8))
     # tree species
     labels = ['Spruce', 'Silver Fir', 'Douglas Fir', 'Pine', 'Oak', 'Beech', 'Sycamore']
     # marker shape and color
@@ -237,6 +237,6 @@ def _plot_symbol(row, ax, tree_types:list, marker_shapes:dict, marker_colors:dic
             x = centroid.x + radius * np.cos(angle)
             y = centroid.y + radius * np.sin(angle)
             # plot
-            ax.plot(x, y, marker=marker_shapes[tree_type], color=marker_colors[tree_type], markersize=8, markeredgewidth=1, markeredgecolor='black')
+            ax.plot(x, y, marker=marker_shapes[tree_type], color=marker_colors[tree_type], markersize=7, markeredgewidth=1, markeredgecolor='black')
             # update angle
             angle += angle_step

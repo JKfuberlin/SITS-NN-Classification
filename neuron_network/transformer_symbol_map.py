@@ -22,7 +22,7 @@ MODEL = 'transformer'
 UID = '7ml20'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH,'ref', 'validation', LABEL_CSV)
-MODEL_PATH = f'../../outputs/models/{METHOD}/02/{MODEL_NAME}.pth'
+MODEL_PATH = f'../../outputs/models/{METHOD}/04/{MODEL_NAME}.pth'
 SHP_PATH = os.path.join(PATH,'shp', 'aoi_polygons.shp')
 
 

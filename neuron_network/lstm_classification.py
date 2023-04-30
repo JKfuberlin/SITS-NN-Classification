@@ -32,8 +32,8 @@ SEED = 24
 
 # hyperparameters for LSTM
 num_bands = 10
-input_size = 64
-hidden_size = 128
+input_size = 128
+hidden_size = 64
 num_layers = 3
 num_classes = 9
 bidirectional = False
