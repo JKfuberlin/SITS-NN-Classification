@@ -150,7 +150,7 @@ def draw_multi_confusion_matirx(ref:pd.DataFrame, pred:pd.DataFrame, model:str) 
 def draw_color_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     """Draw validation map to visulise classification result"""
     # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(10, 8))
     # map class and color
     color_map = {
         'Spruce': '#1f77b4', 
@@ -169,7 +169,7 @@ def draw_color_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     # set legend
     legend_labels = list(color_map.keys())
     handles = [plt.Line2D([], [], color=color_map[label], marker='o', linestyle='', label=label) for label in legend_labels]
-    ax.legend(handles=handles, labels=legend_labels, loc='center left', bbox_to_anchor=(1.0, 0.5))
+    ax.legend(handles=handles, labels=legend_labels, loc='upper left')
     # Set the title and axis labels
     title = f'Color Map of {model} for {area}'
     ax.set_title(title)
@@ -181,7 +181,7 @@ def draw_color_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
 
 def draw_symbol_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     """Draw validation map to visulise multi-label result"""
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(10, 8))
     # tree species
     labels = ['Spruce', 'Silver Fir', 'Douglas Fir', 'Pine', 'Oak', 'Beech', 'Sycamore']
     # marker shape and color
@@ -209,7 +209,7 @@ def draw_symbol_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     gdf.apply(lambda row: _plot_symbol(row, ax, labels, shape_map, color_map), axis=1)
     # set legend
     handles = [plt.Line2D([], [], color=color_map[label], marker=shape_map[label], linestyle='', label=label) for label in labels]
-    ax.legend(handles=handles, labels=labels, loc='center left', bbox_to_anchor=(1.0, 0.5))
+    ax.legend(handles=handles, labels=labels, loc='upper left')
     # Set the title and axis labels
     title = f'Symbol Map of {model} for {area}'
     ax.set_title(title)
