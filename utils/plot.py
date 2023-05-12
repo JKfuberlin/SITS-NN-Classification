@@ -205,6 +205,14 @@ def draw_symbol_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
                     }
     # plot polygon boundary
     gdf.boundary.plot(ax=ax, color='gray', linewidth=1)
+    # plot color
+    for name, group in gdf.groupby('sum'):
+        if name == 7:
+            group.plot(ax=ax, color='#CCFFCC') # light green
+        elif name == 6:
+            group.plot(ax=ax, color='#FFFFCC') # light yellow
+        else:
+            group.plot(ax=ax, color='#FFCCCC') # light red
     # plot symbol
     gdf.apply(lambda row: _plot_symbol(row, ax, labels, shape_map, color_map), axis=1)
     # set legend

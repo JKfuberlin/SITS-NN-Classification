@@ -18,7 +18,7 @@ PATH='/home/admin/dongshen/data'
 DATA_DIR = os.path.join(PATH, 'gee', 'aoi_daily_padding')
 LABEL_CSV = 'multi_aoi.csv'
 METHOD = 'multi_label'
-MODEL = 'bi-lstm'
+MODEL = 'lstm'
 UID = '7ml20'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH,'ref', 'validation', LABEL_CSV)
@@ -32,7 +32,7 @@ input_size = 128
 hidden_size = 64
 num_layers = 3
 num_classes = 7
-bidirectional = True
+bidirectional = False
 
 
 def build_dataloader(x_data:np.ndarray, y_data:np.ndarray) -> Data.DataLoader:
@@ -74,9 +74,12 @@ def predict(dataloader:Data.DataLoader, model:nn.Module) -> pd.DataFrame:
     return pred
 
 
-def map_class(pred:pd.DataFrame, gdf:gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+def map_class(pred:pd.DataFrame, gdf:gpd.GeoDataFrame, labels:pd.DataFrame) -> gpd.GeoDataFrame:
     """map class info to shp file"""
     output = pd.merge(gdf, pred, on='id', how='inner')
+    output.set_index('id', inplace=True)
+    # compare
+    output['sum'] = (labels == output.iloc[:, 19:]).sum(axis=1)
     return output
 
 
@@ -110,7 +113,8 @@ if __name__ == '__main__':
     print('start predicting')
     pred = predict(dataloader, model)
     gdf = shp.load_shp_file(SHP_PATH)
+    labels = csv.load(LABEL_PATH, 'id')
     # class mapping to shp
-    output = map_class(pred, gdf)
+    output = map_class(pred, gdf, labels)
     # drawing map
     validation_map(output)
