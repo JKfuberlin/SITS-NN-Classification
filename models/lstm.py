@@ -13,14 +13,15 @@ class LSTMClassifier(nn.Module):
         if bidirectional:
             self.D = 2
         self.embd = nn.Linear(num_bands, input_size)
+        # definitions of forget gate, memory etc are defined within nn.LSTM:
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, batch_first=True)
         self.fc = nn.Sequential(
-                    nn.Linear(self.D * hidden_size, 256),
-                    nn.ReLU(),
+                    nn.Linear(self.D * hidden_size, 256), # hidden layer 1, amount of neurons in input layer get reduced to 256
+                    nn.ReLU(), # activation function
                     nn.BatchNorm1d(256),
-                    nn.Dropout(0.3),
-                    nn.Linear(256, num_classes),
-                    nn.Softmax(dim=1)
+                    nn.Dropout(0.3), # dropping units at random to prevent overfitting
+                    nn.Linear(256, num_classes), # hidden layer 2
+                    nn.Softmax(dim=1) # final layer to calculate probablitiy for each class
                 )
 
     def forward(self, x:Tensor):
