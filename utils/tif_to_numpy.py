@@ -66,7 +66,7 @@ datacube = np.stack([rasterio.open(raster_path).read() for raster_path in raster
 # # Convert datacube raster to a matrix
 # mymat = datacube.reshape((-1, datacube.shape[-1]))
 
-model = joblib.load('/my_volume/bi_lstm_demo.pkl')
+model = torch.load('/my_volume/bi_lstm_demo.pth',  map_location=torch.device('cpu'))
 datacube = np.load('/my_volume/datacube.npy')
 
 # need to transform datacube numpy array into tensor
