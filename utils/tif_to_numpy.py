@@ -1,76 +1,259 @@
-import os
-import glob
-import re
-import rasterio
-import geopandas as gpd
-import numpy as np
-import torch
-import joblib
+import os # for
+import glob # for grepping i guess
+import re # for
+import rasterio # for reading rasters
+import geopandas as gpd # for
+import numpy as np # for
+import sys # for getting object size
+import torch # for loading the model and actual inference
 
-# Set the EPSG code
-epsg_code = 3035
+epsg_code = 3035 # Set the EPSG code
+shapes = gpd.read_file('/home/eouser/shapes/FEpoints10m_3035.gpkg') # Read shapefiles
+tiles = shapes['Tile_ID'].unique() # Get unique Tile IDs for iteration
+s2dirs_aoi = glob.glob('/force/FORCE/C1/L2/ard/X0058_Y0056', recursive=True) # Initialize path to Sentinel-2 time series TODO: make this iterable by reading the last part from tile IDs
 
-# Read shapefiles
-shapes = gpd.read_file('/home/eouser/shapes/FEpoints10m_3035.gpkg')
+raster_paths = [] # create object to be filled with rasters to be stacked
+for s2dir in s2dirs_aoi: # Get tifs from each folder
+    tifs = glob.glob(os.path.join(s2dir, "*SEN*BOA.tif")) # i want to ignore the landsat files and stack only sentinel 2 bottom of atmosphere observations
+    raster_paths.extend(tifs) # write the ones i need into my object to stack from
 
-# Get unique Tile IDs
-tiles = shapes['Tile_ID'].unique()
+years = [int(re.search(r"\d{8}", raster_path).group(0)) for raster_path in raster_paths] # i need to extract the date from each file path...
+raster_paths = [raster_path for raster_path, year in zip(raster_paths, years) if year <= 20230302] # ... to cut off at last image 20230302 as i trained my model with this sequence length, this might change in the future with transformers
 
-# Initialize path to Sentinel-2 time series
-s2dirs = glob.glob('/force/FORCE/C1/L2/ard/**', recursive=True)
+# i am not sure if i need to rename the datacube layers to fit what the model is trained on -> Annex I
 
-# Process each tile (only the first tile in this code snippet)
-tile = tiles[0]
-g = str(tile)
-s2dirs_aoi = [s2dir for s2dir in s2dirs if re.search(g, s2dir)]
+# the datacube is too large for the RAM of my contingent so i need to subset, i first try the workflow with an AOI:
 
-raster_paths = []
-# Pattern for regex: 20221127_LEVEL2_SEN2A_BOA.tif
-# Get tifs from each folder
-for s2dir in s2dirs_aoi:
-    tifs = glob.glob(os.path.join(s2dir, "*SEN*BOA.tif"))
-    raster_paths.extend(tifs)
+# geopandas + numpy approach
+shapefile_path = '/my_volume/shapes/aoi_Hardtwald/aoi_Hardtwald_3035.gpkg'
+crop_shape = gpd.read_file(shapefile_path)
 
-raster_paths2 = []
+# approach rasterio
+# datacube = [rasterio.open(raster_path).read() for raster_path in raster_paths] # Load raster data as a datacube, unfortunately this creates a list that i cannot crop
+#
+# for raster in datacube:
+#     raster = rio.clip(crop_shape.geometry.apply(mapping))
+import rioxarray as rxr
+from shapely.geometry import mapping
 
-# Cut off at last image 20230302
-# Extract year from filenames
-years = [int(re.search(r"\d{8}", raster_path).group(0)) for raster_path in raster_paths]
+datacube2 = [rxr.open_rasterio(raster_path) for raster_path in raster_paths]
+compare = rasterio.open(raster_paths[1])
+datacube3 = [rasterio.open(raster_path) for raster_path in raster_paths]
 
-# Filter filenames based on the condition
-raster_paths = [raster_path for raster_path, year in zip(raster_paths, years) if year <= 20230302]
+clipped_datacube = []
+import datetime
+ct1 = datetime.datetime.now()
+print("current time:-", ct1)
+for raster in datacube2:
+    clipped_raster = raster.rio.clip(crop_shape.geometry.apply(mapping))
+    print('.')
+    clipped_datacube.append(clipped_raster)
 
-# Create a vector for renaming the datacube
-for path in raster_paths:
-    for band in range(1, 11):
-        c = f"{path}{band}"
-        raster_paths2.append(c)
+ct = datetime.datetime.now()
+print("current time:-", ct)
+print("start time:-", ct1)
 
-# Load raster data as a datacube
-datacube = np.stack([rasterio.open(raster_path).read() for raster_path in raster_paths], axis=-1)
+
+clipped_datacube[2]
+
+np.save('/my_volume/clipped_datacube.npy', clipped_datacube)
+
+#should be [number of samples, sequence length, number of bands]
+# i have sequence length, num bands, x, y need to flatten the data
+# squeeze/unsqueeze / transpose
+datacube_np = np.stack(clipped_datacube)
+datacube_np = np.stack(clipped_datacube, axis=-1) # turn the datacube into a numpy array so it can be turnt into a tensor for inference
+
+torch.Size([10, 320, 202, 203])
+
+data_for_prediction = torch.tensor(datacube_np) # int16
+data_for_prediction = data_for_prediction.to(torch.float32) # this crashes the python env
+
+data = data_for_prediction.view(10, 320, -1)
+data_for_prediction = data.permute(2, 1, 0)
+# the output size should be (number of pixels = 203 * 202, sequence length = 320, number of bands = 10)
+
+# i need to add one dimension where the prediction is written into
+# flatten the image and turn all rows of pixels into a sequence so i don't have the 203*202 problem.
+
+# try dataset = Data.TensorDataset(data_for_prediction)
+
 # datacube should now be a numpy array and ready for inference
+device = torch.device('cpu')
+model = torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu'))
+prediction = model(data_for_prediction)
 
-# don't need this:
-# print(f"Loading rasters {g}")
-# # Rename raster names to include time
-# datacube_names = dict(zip(range(1, 11), raster_paths2))
-# datacube = datacube.rename(datacube_names, axis=-1)
-#
-# # Extract bounding box from datacube and convert it to a GeoDataFrame
-# bbox = shapes.total_bounds
-# b = gpd.GeoSeries(gpd.GeoDataFrame(geometry=[gpd.box(*bbox)]))
-# b.crs = f"EPSG:{epsg_code}"
-# shapes_extract = gpd.sjoin(shapes, b, how='inner', op='intersects')
-# print(len(shapes_extract))
-#
-# # Convert datacube raster to a matrix
-# mymat = datacube.reshape((-1, datacube.shape[-1]))
+# bugfixing
+num_bands = 12
+input_size = 16
+hidden_size = 32
+num_layers = 1
+num_classes = 9
+bidirectional = True
 
-model = torch.load('/my_volume/bi_lstm_demo.pth',  map_location=torch.device('cpu'))
+from lstm import LSTMClassifier
+from models.lstm import LSTMClassifier
+
+
+# model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
+# model.load_state_dict(torch.load('/my_volume/bi_lstm_demo.pth',  map_location=torch.device('cpu')))
+# model.load_state_dict(torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu')))
+#
+# with open('/my_volume/bi_lstm_demo.pkl', 'rb') as f:
+#     loaded_classifier = pickle.load(f)
+
+
+
+# model = torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu'))
+# pickled_model = pickle.load(open('/my_volume/bi_lstm_demo.pth', 'rb'))
+
 datacube = np.load('/my_volume/datacube.npy')
 
-# need to transform datacube numpy array into tensor
-data_for_prediction = datacube_tensor.reshape(-1, num_bands)
-data_for_prediction = torch.tensor(data_for_prediction)
-predictions = model.predict(data_for_prediction)
+
+
+
 #x_set = torch.from_numpy(datacube)
+
+# Annex: here i put all the code that might be useful once again
+
+# ANNEX I
+# # Create a vector for renaming the datacube
+# for path in raster_paths:
+#     for band in range(1, 11):
+#         c = f"{path}{band}"
+#         raster_paths2.append(c)
+
+# ANNEX II reading in rasters
+# approach tifffile
+# import tifffile as tiff
+# # using datetime module
+# import datetime
+#
+# # ct stores current time
+# ct = datetime.datetime.now()
+# print("current time:-", ct)
+# images = [tiff.imread(raster_path) for raster_path in raster_paths]
+# ct = datetime.datetime.now()
+# print("current time:-", ct)
+# stacked_image = np.stack(images, axis=-1)
+# cropped_image = stacked_image[:, ymin:ymax, xmin:xmax]
+
+
+
+# approach opencv
+# images = [cv2.imread(raster_path, cv2.IMREAD_UNCHANGED) for raster_path in raster_paths]
+# stacked_image = np.stack(images, axis=-1)
+# cropped_data1 = stacked_image[:, ymin:ymax, xmin:xmax]
+# cropped_data2 = stacked_image[ymin:ymax, xmin:xmax, :]
+# cropped_data3 = stacked_image[ymin:ymax, xmin:xmax,]
+#
+# # approach rio.stack
+# datacube_rio = stack(raster_paths)
+#
+# # approach earthpy
+# import earthpy as et
+# import earthpy.spatial as es
+# datacube_earthpy = es.stack(raster_paths)
+# def crop_raster(datacube_np, xmin, ymin, xmax, ymax):
+#     cropped_data = datacube_np[:, ymin:ymax, xmin:xmax]
+#     return cropped_data
+#
+# # custom earthpy approach
+# from custom import custom_stack
+# test = custom_stack(raster_paths)
+
+
+# ANNEX III
+# read a shapefile with fiona:
+# with fiona.open('/my_volume/shapes/aoi_Hardtwald/aoi_Hardtwald.shp', "r") as shapefile: # load the AOI for this test, there also is a gpkg
+#     crop_shape = [feature["geometry"] for feature in shapefile]
+
+
+# other approaches to stacking the raster
+# # approach rio.stack
+# datacube = stack(raster_paths)
+#
+#
+# # approach I
+# # Read metadata of first file
+# with rasterio.open(raster_paths[0]) as src0:
+#     meta = src0.meta
+#
+# # Update meta to reflect the number of layers
+# meta.update(count = len(raster_paths))
+#
+# # Read each layer and write it to stack
+# with rasterio.open('stack.tif', 'w', **meta) as dst:
+#     for id, layer in enumerate(raster_paths, start=1):
+#         with rasterio.open(layer) as src1:
+#             dst.write_band(id, src1.read(1))
+
+
+#
+# datacube = [rasterio.open(raster_path).read() for raster_path in raster_paths] # Load raster data as a datacube, unfortrunately this creates a list that i cannot crop
+# for raster in datacube:
+#     raster = raster.rasterio.clip(crop_shape.geometry.apply(mapping),
+#                                       # This is needed if your GDF is in a diff CRS than the raster data
+#                                       crop_shape.crs)
+#
+# # data_crop = rasterio.mask.mask(datacube, crop_shape, crop = True)
+#
+#
+# data_crop = datacube.rasterio.clip(crop_shape.geometry.apply(mapping),
+#                                       # This is needed if your GDF is in a diff CRS than the raster data
+#                                       crop_shape.crs)
+#
+#
+# datacube_np = np.stack(data_crop, axis=-1) # turn the datacube into a numpy array so it can be turnt into a tensor for inference
+#
+
+# ANNEX who cares:
+# trying to crop using coordinates
+
+# xmin, ymin, xmax, ymax = crop_shape.total_bounds # getting the bounds of the shapefile of my aoi
+#
+# # yes, i really don't know how to do this in a smart way, judge me
+# xmin = int(xmin)
+# xmax = int(xmax)
+# ymin = int(ymin)
+# ymax = int(ymax)
+
+
+
+
+# #saving
+# kwargs = datacube2[2].meta
+# kwargs.update(
+#     dtype=rasterio.float32,
+#     count=1,
+#     compress='lzw')
+#
+# with rasterio.open(os.path.join('/my_volume/', 'example.tif'), 'w', **kwargs) as dst:
+#     dst.write_band(1, datacube2.astype(rasterio.float32))
+#
+#
+#
+# with rasterio.Env():
+#     profile = datacube2[2].profile
+#     profile.update(
+#         dtype=rasterio.uint8,
+#         count=1,
+#         compress='lzw')
+#     with rasterio.open('/my_volume/example.tif', 'w', **profile) as dst:
+#         dst.write(datacube2.astype(rasterio.uint8), 1)
+
+# a = rasterio.open(raster_paths[0])
+# >>> a.bounds
+# BoundingBox(left=4196026.3630416505, bottom=2864919.6079648044, right=4226026.3630416505, top=2894919.6079648044)
+# while
+# >>> crop_shape.geometry[0]
+# <POLYGON ((457870.222 5437357.401, 459870.222 5437357.401, 459870.222 543535...>
+
+# sys.getsizeof(datacube_np)
+# # datacube_cropped = crop_raster(datacube_np, xmin, ymin, xmax, ymax)
+# cropped_data = datacube_np[:, ymin:ymax, xmin:xmax]
+# cropped_data = datacube_np[ymin:ymax, xmin:xmax]
+# sys.getsizeof(cropped_data)
+
+# need to transform datacube numpy array into tensor
+# data_for_prediction = datacube.reshape(-1, num_bands)
