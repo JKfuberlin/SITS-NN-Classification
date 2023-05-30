@@ -6,6 +6,8 @@ import geopandas as gpd # for
 import numpy as np # for
 import sys # for getting object size
 import torch # for loading the model and actual inference
+import rioxarray as rxr
+from shapely.geometry import mapping
 
 epsg_code = 3035 # Set the EPSG code
 shapes = gpd.read_file('/home/eouser/shapes/FEpoints10m_3035.gpkg') # Read shapefiles
@@ -33,8 +35,7 @@ crop_shape = gpd.read_file(shapefile_path)
 #
 # for raster in datacube:
 #     raster = rio.clip(crop_shape.geometry.apply(mapping))
-import rioxarray as rxr
-from shapely.geometry import mapping
+
 
 datacube2 = [rxr.open_rasterio(raster_path) for raster_path in raster_paths]
 compare = rasterio.open(raster_paths[1])
@@ -56,40 +57,81 @@ print("start time:-", ct1)
 
 clipped_datacube[2]
 
+device = torch.device('cpu')
+model_pkl = torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu'))
+
 np.save('/my_volume/clipped_datacube.npy', clipped_datacube)
+clipped_datacube = np.load('/my_volume/clipped_datacube.npy')
 
 #should be [number of samples, sequence length, number of bands]
 # i have sequence length, num bands, x, y need to flatten the data
 # squeeze/unsqueeze / transpose
 datacube_np = np.stack(clipped_datacube)
-datacube_np = np.stack(clipped_datacube, axis=-1) # turn the datacube into a numpy array so it can be turnt into a tensor for inference
+# datacube_np = np.stack(clipped_datacube, axis=-1) # turn the datacube into a numpy array so it can be turnt into a tensor for inference
 
-torch.Size([10, 320, 202, 203])
+# torch.Size([10, 320, 202, 203])
 
 data_for_prediction = torch.tensor(datacube_np) # int16
 data_for_prediction = data_for_prediction.to(torch.float32) # this crashes the python env
 
-data = data_for_prediction.view(10, 320, -1)
-data_for_prediction = data.permute(2, 1, 0)
+# data = data_for_prediction.view(10, 320, -1)# flattening last two
+# data_for_prediction = data.permute(2, 1, 0)
 # the output size should be (number of pixels = 203 * 202, sequence length = 320, number of bands = 10)
 
 # i need to add one dimension where the prediction is written into
 # flatten the image and turn all rows of pixels into a sequence so i don't have the 203*202 problem.
 
 # try dataset = Data.TensorDataset(data_for_prediction)
+x=clipped_datacube.shape[2]
+y=clipped_datacube.shape[3]
+# minibatch_size = 512
+# batch_num = (x*y)/minibatch_size
+# iterator = 0
+#
+# for batch in [0:batch_num]
 
+# create empty tensor to fill with outputs
+prediction = torch.zeros([x,y])
+# rearrange data
+data_for_prediction = data_for_prediction.permute(2, 3, 0, 1)
+
+for i in range(x):
+    input = data_for_prediction[i]
+    outputs = model_pkl(input)
+    _, predicted = torch.max(outputs.data, 1)
+    prediction[i] = predicted
+    print(i)
+
+
+# minibatch = data_for_prediction[0:512]
 # datacube should now be a numpy array and ready for inference
-device = torch.device('cpu')
-model = torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu'))
-prediction = model(data_for_prediction)
 
-# bugfixing
-num_bands = 12
-input_size = 16
-hidden_size = 32
-num_layers = 1
-num_classes = 9
+
+# i need to send model and dataset.to(device)
+# and i need to modify the model architecture to accept cpu instead of gpu
+#
+
+
+# # bugfixing
+# num_bands = 12
+# input_size = 16
+# hidden_size = 32
+# num_layers = 1
+# num_classes = 9
+# bidirectional = True
+
+num_bands = 10
+input_size = 64
+hidden_size = 128
+num_layers = 3
+num_classes = 10
 bidirectional = True
+
+# TODO review which pth file is written on gromit
+from lstm  import LSTMCPU
+model_pth = LSTMCPU(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
+model_pth.load_state_dict(torch.load('/my_volume/bi_lstm_demo.pth',  map_location=torch.device('cpu')))
+prediction = model_pth(minibatch)
 
 from lstm import LSTMClassifier
 from models.lstm import LSTMClassifier
