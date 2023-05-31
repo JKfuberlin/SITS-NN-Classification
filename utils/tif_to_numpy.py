@@ -8,6 +8,8 @@ import sys # for getting object size
 import torch # for loading the model and actual inference
 import rioxarray as rxr
 from shapely.geometry import mapping
+import multiprocessing # for parallelization
+
 
 epsg_code = 3035 # Set the EPSG code
 shapes = gpd.read_file('/home/eouser/shapes/FEpoints10m_3035.gpkg') # Read shapefiles
@@ -26,47 +28,17 @@ raster_paths = [raster_path for raster_path, year in zip(raster_paths, years) if
 
 # the datacube is too large for the RAM of my contingent so i need to subset, i first try the workflow with an AOI:
 
-# geopandas + numpy approach
-shapefile_path = '/my_volume/shapes/aoi_Hardtwald/aoi_Hardtwald_3035.gpkg'
-crop_shape = gpd.read_file(shapefile_path)
-
-# approach rasterio
-# datacube = [rasterio.open(raster_path).read() for raster_path in raster_paths] # Load raster data as a datacube, unfortunately this creates a list that i cannot crop
-#
-# for raster in datacube:
-#     raster = rio.clip(crop_shape.geometry.apply(mapping))
-
-
-datacube2 = [rxr.open_rasterio(raster_path) for raster_path in raster_paths]
-compare = rasterio.open(raster_paths[1])
-datacube3 = [rasterio.open(raster_path) for raster_path in raster_paths]
-
-clipped_datacube = []
-import datetime
-ct1 = datetime.datetime.now()
-print("current time:-", ct1)
-for raster in datacube2:
-    clipped_raster = raster.rio.clip(crop_shape.geometry.apply(mapping))
-    print('.')
-    clipped_datacube.append(clipped_raster)
-
-ct = datetime.datetime.now()
-print("current time:-", ct)
-print("start time:-", ct1)
-
-
-clipped_datacube[2]
-
+# np.save('/my_volume/clipped_datacube.npy', clipped_datacube)
+# clipped_datacube = np.load('/my_volume/clipped_datacube.npy')
 device = torch.device('cpu')
 model_pkl = torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu'))
 
-np.save('/my_volume/clipped_datacube.npy', clipped_datacube)
-clipped_datacube = np.load('/my_volume/clipped_datacube.npy')
+datacube = [rxr.open_rasterio(raster_path) for raster_path in raster_paths]
 
 #should be [number of samples, sequence length, number of bands]
 # i have sequence length, num bands, x, y need to flatten the data
 # squeeze/unsqueeze / transpose
-datacube_np = np.stack(clipped_datacube)
+datacube_np = np.stack(datacube)
 # datacube_np = np.stack(clipped_datacube, axis=-1) # turn the datacube into a numpy array so it can be turnt into a tensor for inference
 
 # torch.Size([10, 320, 202, 203])
@@ -95,12 +67,44 @@ prediction = torch.zeros([x,y])
 # rearrange data
 data_for_prediction = data_for_prediction.permute(2, 3, 0, 1)
 
-for i in range(x):
-    input = data_for_prediction[i]
+def predict(input):
     outputs = model_pkl(input)
     _, predicted = torch.max(outputs.data, 1)
-    prediction[i] = predicted
-    print(i)
+    return predicted
+
+# Define the number of cores to use
+num_cores = 15
+
+# Create a multiprocessing pool
+pool = multiprocessing.Pool(processes=num_cores)
+
+# Iterate over the range in parallel and store the results in a list
+predictions = pool.map(predict, data_for_prediction)
+
+# Close the pool to release resources
+pool.close()
+pool.join()
+
+# Convert the list to an array if desired
+predictions = torch.tensor(predictions)
+
+map = prediction.numpy()
+ct = datetime.datetime.now()
+print("current time:-", ct)
+print("start time:-", ct1)
+# now the numpy array needs a crs and so on to be saved as a GEOTiff
+# first i retrieve the metadata from the original raster
+with rasterio.open(raster_paths[0]) as src: # i can use any image from the stack cuz they all the same
+    metadata = src.meta
+    # Update the number of bands in the metadata to match the modified image
+    metadata['count'] = 1
+
+with rasterio.open('/my_volume/map_BILSTM_X0058_Y0056.tif', 'w', **metadata) as dst: # open write connection to file using the metadata
+    dst.write(map, 1)
+ct = datetime.datetime.now()
+print("current time:-", ct)
+print("start time:-", ct1)
+print('done')
 
 
 # minibatch = data_for_prediction[0:512]
@@ -211,6 +215,30 @@ datacube = np.load('/my_volume/datacube.npy')
 #     crop_shape = [feature["geometry"] for feature in shapefile]
 
 
+# ANNEX IV - clipping the datacube to AOI extent:
+#
+# shapefile_path = '/my_volume/shapes/aoi_Hardtwald/aoi_Hardtwald_3035.gpkg'
+# crop_shape = gpd.read_file(shapefile_path)
+#
+# # i user rxr because the clip function from rasterio sucks
+# datacube2 = [rxr.open_rasterio(raster_path) for raster_path in raster_paths]
+# compare = rasterio.open(raster_paths[1])
+#
+# clipped_datacube = []
+# import datetime
+# ct1 = datetime.datetime.now()
+# print("current time:-", ct1)
+# for raster in datacube2:
+#     clipped_raster = raster.rio.clip(crop_shape.geometry.apply(mapping))
+#     print('.')
+#     clipped_datacube.append(clipped_raster)
+#
+#
+# ct = datetime.datetime.now()
+# print("current time:-", ct)
+# print("start time:-", ct1)
+
+# ANNEX V
 # other approaches to stacking the raster
 # # approach rio.stack
 # datacube = stack(raster_paths)
