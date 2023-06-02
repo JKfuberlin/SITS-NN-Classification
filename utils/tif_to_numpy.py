@@ -19,7 +19,7 @@ tile = 'X0058_Y0056'
 epsg_code = 3035 # Set the EPSG code
 shapes = gpd.read_file('/home/eouser/shapes/FEpoints10m_3035.gpkg') # Read shapefiles
 tiles = shapes['Tile_ID'].unique() # Get unique Tile IDs for iteration
-s2dirs_aoi = glob.glob(('/force/FORCE/C1/L2/ard/'+tile), recursive=True) # Initialize path to Sentinel-2 time series TODO: make this iterable by reading the last part from tile IDs
+s2dirs_aoi = glob.glob(('/force/FORCE/C1/L2/ard/'+tile), recursive=True) # Initialize path to Sentinel-2 time series
 
 raster_paths = [] # create object to be filled with rasters to be stacked
 for s2dir in s2dirs_aoi: # Get tifs from each folder
