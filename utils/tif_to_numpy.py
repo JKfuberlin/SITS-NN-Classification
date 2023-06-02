@@ -4,17 +4,22 @@ import re # for
 import rasterio # for reading rasters
 import geopandas as gpd # for
 import numpy as np # for
-import sys # for getting object size
+import datetime # for benchmarking
 import torch # for loading the model and actual inference
-import rioxarray as rxr
-from shapely.geometry import mapping
+import rioxarray as rxr # for raster clipping
+
 import multiprocessing # for parallelization
+from models.lstm import LSTMClassifier
+
+import sys # for getting object size
+from shapely.geometry import mapping
 
 
+tile = 'X0058_Y0056'
 epsg_code = 3035 # Set the EPSG code
 shapes = gpd.read_file('/home/eouser/shapes/FEpoints10m_3035.gpkg') # Read shapefiles
 tiles = shapes['Tile_ID'].unique() # Get unique Tile IDs for iteration
-s2dirs_aoi = glob.glob('/force/FORCE/C1/L2/ard/X0058_Y0056', recursive=True) # Initialize path to Sentinel-2 time series TODO: make this iterable by reading the last part from tile IDs
+s2dirs_aoi = glob.glob(('/force/FORCE/C1/L2/ard/'+tile), recursive=True) # Initialize path to Sentinel-2 time series TODO: make this iterable by reading the last part from tile IDs
 
 raster_paths = [] # create object to be filled with rasters to be stacked
 for s2dir in s2dirs_aoi: # Get tifs from each folder
@@ -24,9 +29,9 @@ for s2dir in s2dirs_aoi: # Get tifs from each folder
 years = [int(re.search(r"\d{8}", raster_path).group(0)) for raster_path in raster_paths] # i need to extract the date from each file path...
 raster_paths = [raster_path for raster_path, year in zip(raster_paths, years) if year <= 20230302] # ... to cut off at last image 20230302 as i trained my model with this sequence length, this might change in the future with transformers
 
-# i am not sure if i need to rename the datacube layers to fit what the model is trained on -> Annex I
 
 # the datacube is too large for the RAM of my contingent so i need to subset, i first try the workflow with an AOI:
+
 
 # np.save('/my_volume/clipped_datacube.npy', clipped_datacube)
 # clipped_datacube = np.load('/my_volume/clipped_datacube.npy')
@@ -34,17 +39,24 @@ device = torch.device('cpu')
 model_pkl = torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu'))
 
 datacube = [rxr.open_rasterio(raster_path) for raster_path in raster_paths]
+# datacube = [rasterio.open(raster_path) for raster_path in raster_paths]
 
 #should be [number of samples, sequence length, number of bands]
 # i have sequence length, num bands, x, y need to flatten the data
 # squeeze/unsqueeze / transpose
 datacube_np = np.stack(datacube)
+
+np.save('/my_volume/datacube_np.npy', datacube_np)
+datacube_np = np.load('/my_volume/datacube_np.npy')
+
 # datacube_np = np.stack(clipped_datacube, axis=-1) # turn the datacube into a numpy array so it can be turnt into a tensor for inference
 
 # torch.Size([10, 320, 202, 203])
 
-data_for_prediction = torch.tensor(datacube_np) # int16
-data_for_prediction = data_for_prediction.to(torch.float32) # this crashes the python env
+# data_for_prediction = torch.tensor(datacube_np) # int16
+# data_for_prediction = data_for_prediction.to(torch.float32) # this crashes the python env
+
+data_for_prediction = torch.cat(processed_chunks, dim=0)
 
 # data = data_for_prediction.view(10, 320, -1)# flattening last two
 # data_for_prediction = data.permute(2, 1, 0)
@@ -89,9 +101,8 @@ pool.join()
 predictions = torch.tensor(predictions)
 
 map = prediction.numpy()
-ct = datetime.datetime.now()
-print("current time:-", ct)
-print("start time:-", ct1)
+ct1 = datetime.datetime.now()
+print("current time:-", ct1)
 # now the numpy array needs a crs and so on to be saved as a GEOTiff
 # first i retrieve the metadata from the original raster
 with rasterio.open(raster_paths[0]) as src: # i can use any image from the stack cuz they all the same
@@ -162,12 +173,13 @@ datacube = np.load('/my_volume/datacube.npy')
 
 # Annex: here i put all the code that might be useful once again
 
-# ANNEX I
+# ANNEX I - # i am not sure if i need to rename the datacube layers to fit what the model is trained on -> Annex I
 # # Create a vector for renaming the datacube
 # for path in raster_paths:
 #     for band in range(1, 11):
 #         c = f"{path}{band}"
 #         raster_paths2.append(c)
+# END I
 
 # ANNEX II reading in rasters
 # approach tifffile
@@ -207,13 +219,13 @@ datacube = np.load('/my_volume/datacube.npy')
 # # custom earthpy approach
 # from custom import custom_stack
 # test = custom_stack(raster_paths)
-
+# END II
 
 # ANNEX III
 # read a shapefile with fiona:
 # with fiona.open('/my_volume/shapes/aoi_Hardtwald/aoi_Hardtwald.shp', "r") as shapefile: # load the AOI for this test, there also is a gpkg
 #     crop_shape = [feature["geometry"] for feature in shapefile]
-
+# END III
 
 # ANNEX IV - clipping the datacube to AOI extent:
 #
@@ -237,6 +249,8 @@ datacube = np.load('/my_volume/datacube.npy')
 # ct = datetime.datetime.now()
 # print("current time:-", ct)
 # print("start time:-", ct1)
+# END IV
+
 
 # ANNEX V
 # other approaches to stacking the raster
@@ -257,6 +271,49 @@ datacube = np.load('/my_volume/datacube.npy')
 #     for id, layer in enumerate(raster_paths, start=1):
 #         with rasterio.open(layer) as src1:
 #             dst.write_band(id, src1.read(1))
+
+
+
+# ANNEX VI - trying to chunk down tensor transformation
+#
+#
+# chunk_size = 1  # Adjust this value based on available memory and array size
+# # num_samples = datacube_np.shape[0] # is this right?
+# num_samples = 3000 # the datacube apparently is 3000 x 3000 in dimension
+# processed_chunks = []
+#
+# # chunk = datacube_np[0:10]
+# # chunk_tensor = torch.tensor(chunk)
+# # chunk = chunk_tensor.to(torch.float32)
+# # processed_chunks.append(chunk_tensor)
+#
+# ct1 = datetime.datetime.now()
+# print("current time:-", ct1)
+#
+# for i in range(0, num_samples, chunk_size):
+#     chunk = datacube_np[i:i+chunk_size]
+#     chunk_tensor = torch.tensor(chunk)
+#     chunk = chunk_tensor.to(torch.float32)
+#     processed_chunks.append(chunk_tensor)
+#     # Perform incremental concatenation if there are more than 1 chunks
+#     while len(processed_chunks) > 1:
+#         new_chunks = []
+#         for j in range(0, len(processed_chunks), 2):
+#             if j+1 < len(processed_chunks):
+#                 combined_chunk = torch.cat([processed_chunks[j], processed_chunks[j+1]], dim=0)
+#                 new_chunks.append(combined_chunk)
+#             else:
+#                 new_chunks.append(processed_chunks[j])
+#         processed_chunks = new_chunks
+#
+# # The single remaining chunk is the final concatenated tensor
+# data_for_prediction = processed_chunks[0]
+#
+# ct = datetime.datetime.now()
+# print("current time:-", ct)
+# print("start time:-", ct1)
+
+# END VI
 
 
 #
