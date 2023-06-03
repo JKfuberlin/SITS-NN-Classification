@@ -107,7 +107,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     total = 0
     losses = []
     for i, (inputs, labels) in enumerate(train_loader):
-        inputs = inputs[:,:, 1:11] # what does this do again? some type of subset
+        inputs = inputs[:,:, 1:11] # this excludes DOY and date
         # put the data in gpu
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -136,7 +136,7 @@ def validate(model:nn.Module) -> Tuple[float, float]:
         total = 0
         losses = []
         for (inputs, labels) in val_loader:
-            inputs = inputs[:, :, 1:11]
+            inputs = inputs[:, :, 1:11] # this excludes DOY and date
             # put the data in gpu
             inputs:Tensor = inputs.to(device)
             labels:Tensor = labels.to(device)

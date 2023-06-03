@@ -100,7 +100,7 @@ x = datacube_np.shape[2]  # i need the dimensions of the raster to create an emp
 y = datacube_np.shape[3]
 # prediction = torch.zeros([x, y])  # create empty tensor where results will be written
 # data_for_prediction = data_for_prediction.permute(2, 3, 0, 1)  # rearrange data
-
+yv
 data = data_for_prediction.view(10, 500, -1) # this turns the data into a 3D tensor of rowsxcolumnsxbands
 data_for_prediction = data.permute(2, 1, 0) # reorders
 
