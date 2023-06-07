@@ -9,6 +9,7 @@ import torch # for loading the model and actual inference
 import rioxarray as rxr # for raster clipping
 import multiprocessing # for parallelization
 from shapely.geometry import mapping # for clipping
+from rasterio.transform import from_origin # for assigning an origin to the created map
 
 tiles = np.loadtxt('/my_volume/BW_tiles.txt', dtype=str) # this file contains the XY tile names of my AOI in the same format as FORCE
 
@@ -119,14 +120,21 @@ for row in range(x):
 result = torch.tensor(result)  # Convert the list to an array
 map = result.numpy()
 
-with rasterio.open(os.path.join('/my_volume/', 'example.tif'), 'w') as dst:
+crop_geometry = crop_shape.geometry.iloc[0]
+crop_bounds = crop_geometry.bounds
+origin = (crop_bounds[0], crop_bounds[3])  # Extract the origin from the bounds
+
+
+# construct metadata from minitile and matrix
+metadata = {
+    'driver': 'GTiff',
+    'width': map.shape[1],
+    'height': map.shape[0],
+    'count': 1,  # Number of bands
+    'dtype': map.dtype,
+    'crs': 'EPSG:3035',  # Set the CRS (coordinate reference system) code as needed
+    'transform': from_origin(origin[0], origin[1], 10, 10)  # Set the origin and pixel size (assumes each pixel is 1 unit)
+}
+
+with rasterio.open(os.path.join('/my_volume/', 'example.tif'), 'w', **metadata) as dst:
     dst.write_band(1, map.astype(rasterio.float32))
-
-
-# i rewrote this into a function
-# for i in range(x):
-#     input = data_for_prediction[i]
-#     outputs = model_pkl(input)
-#     _, predicted = torch.max(outputs.data, 1)
-#     prediction[i] = predicted
-#     print(i)
