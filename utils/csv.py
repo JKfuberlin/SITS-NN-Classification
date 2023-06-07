@@ -47,6 +47,44 @@ def balance_labels(label_path:str):
     balanced_df = balanced_df.sample(frac=1, random_state=42)
     return balanced_df
 
+def subset_filenames(data_dir:str):
+    # i want to find out which csv files really are existent in my subset/on my drive and only select the matching labels
+    import glob
+    # Define the pattern to match the CSV files
+    file_pattern = data_dir + '*.csv'
+    # Retrieve the filenames that match the pattern
+    csv_files = glob.glob(file_pattern)
+    # Extract the filenames without the extension
+    file_names = [file.split('/')[-1].split('.')[0] for file in csv_files]
+    file_names = [int(x) for x in file_names]
+    return file_names
+
+def balance_labels_subset(label_path:str, data_dir:str):
+    file_names = subset_filenames(data_dir)
+    labels = pd.read_csv(label_path, sep=',', header=0) # this loads all labels from the csv file
+    try:
+        labels = labels.drop("Unnamed: 0", axis=1) # just tidying up, removing an unnecessary column
+        labels = labels.drop("X", axis=1)  # just tidying up, removing an unnecessary column
+    except:
+        print(labels)
+    labels_subset = labels[labels['ID'].isin(file_names)] # drops all entries from the labels that do not have a corresponding csv file on the drive / in the subset
+    # find out least common class in labels and count the occurrences of each label for balancing
+    label_counts = labels_subset["encoded"].value_counts()
+    minority_label = label_counts.idxmin()  # Get the label with the least occurrences
+    minority_count = label_counts[minority_label] # Get the number of occurrences of the minority label
+    labels = labels_subset # just resetting the variable name
+    dfs = [] # empty list
+    for label in label_counts.index:
+        label_df = labels[labels["encoded"] == label]
+        if len(label_df) > minority_count:
+            label_df = label_df.sample(minority_count, random_state=42)
+        dfs.append(label_df)
+    # Concatenate the dataframes
+    balanced_df = pd.concat(dfs)
+    # Shuffle the dataframe
+    balanced_df = balanced_df.sample(frac=1, random_state=42)
+    return balanced_df
+
 def to_numpy(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
     """Load label and time series data, transfer them to numpy array"""
     print("load training data")
@@ -69,6 +107,40 @@ def to_numpy(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
         padding = np.zeros((max_len - x.shape[0], x.shape[1]))
         x = np.concatenate((x, padding), dtype=np.float32)
         y = row['encoded']
+        x_list.append(x)
+        y_list.append(y)
+    # concatenate array list
+    x_data = np.array(x_list)
+    y_data = np.array(y_list)
+    print("transferred data to numpy array")
+    return x_data, y_data
+
+def to_numpy_subset(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
+    """Load label and time series data, transfer them to numpy array"""
+    labels = labels # at this point we already created cleaned up labels from a previous function
+    # Step 1: find max time steps
+    max_len = 0
+    # TODO: something is messed up with the column names, i think naming one of them "ID" is a bad idea as it somehow gets switched around with the index
+    for id in labels['ID']:
+        df_path = os.path.join(data_dir, f'{id}.csv')
+        df = load(df_path, 'date', True)
+        max_len = max(max_len, df.shape[0])
+    print(f'max sequence length: {max_len}')
+    # Step 2: transfer to numpy array
+    x_list = []
+    y_list = []
+
+    for row in labels.iterrows():
+        print(row[1]) # TODO: this is where it gets messed up and the fake index of the row i cannot change gets confused with the actual ID within the tuple
+    for row in labels.iterrows():
+        ID = row[1] # the true value for the ID after NA removal and some messing up is here, this value identifies the csv
+        df_path = os.path.join(data_dir, f'{ID}.csv')
+        df = load(df_path, 'date', True)
+        x = np.array(df).astype(np.float32)
+        # use 0 padding make sequence length equal
+        padding = np.zeros((max_len - x.shape[0], x.shape[1]))
+        x = np.concatenate((x, padding), dtype=np.float32)
+        y = row[3]
         x_list.append(x)
         y_list.append(y)
     # concatenate array list
