@@ -7,11 +7,11 @@ import os
 def load(file_path:str, index_col:str, date:bool=False) -> pd.DataFrame:
     """Load csv file to pandas.Dataframe"""
     if date:
-        df = pd.read_csv(file_path, sep=',', header=0, parse_dates = ['date'], index_col=index_col)
+        df = pd.read_csv(file_path, sep=',', header=0, parse_dates = ['date'], index_col=False)
         # delete date when no available data
         df.dropna(axis=0, how='any', inplace=True)
     else:
-        df = pd.read_csv(file_path, sep=',', header=0, index_col=index_col)
+        df = pd.read_csv(file_path, sep=',', header=0, index_col=False)
     return df
 
 
@@ -51,7 +51,7 @@ def subset_filenames(data_dir:str):
     # i want to find out which csv files really are existent in my subset/on my drive and only select the matching labels
     import glob
     # Define the pattern to match the CSV files
-    file_pattern = data_dir + '*.csv'
+    file_pattern = data_dir + '/*.csv'
     # Retrieve the filenames that match the pattern
     csv_files = glob.glob(file_pattern)
     # Extract the filenames without the extension
@@ -61,7 +61,7 @@ def subset_filenames(data_dir:str):
 
 def balance_labels_subset(label_path:str, data_dir:str):
     file_names = subset_filenames(data_dir)
-    labels = pd.read_csv(label_path, sep=',', header=0) # this loads all labels from the csv file
+    labels = pd.read_csv(label_path, sep=',', header=0, index_col=False) # this loads all labels from the csv file
     try:
         labels = labels.drop("Unnamed: 0", axis=1) # just tidying up, removing an unnecessary column
         labels = labels.drop("X", axis=1)  # just tidying up, removing an unnecessary column
@@ -102,6 +102,7 @@ def to_numpy(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
     for index, row in labels.iterrows():
         df_path = os.path.join(data_dir, f'{index}.csv') # TODO: fix csv names
         df = load(df_path, 'date', True)
+        df = df.drop('date', axis=1) # i decided to drop the date again because i cannot convert it to float32 and i still have DOY for identification
         x = np.array(df).astype(np.float32)
         # use 0 padding make sequence length equal
         padding = np.zeros((max_len - x.shape[0], x.shape[1]))
@@ -130,17 +131,17 @@ def to_numpy_subset(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
     x_list = []
     y_list = []
 
-    for row in labels.iterrows():
-        print(row[1]) # TODO: this is where it gets messed up and the fake index of the row i cannot change gets confused with the actual ID within the tuple
-    for row in labels.iterrows():
-        ID = row[1] # the true value for the ID after NA removal and some messing up is here, this value identifies the csv
+    for tuple in labels.iterrows():
+        info = tuple[1] # access the first element of the tuple, which is a <class 'pandas.core.series.Series'>
+        ID = info[0] # the true value for the ID after NA removal and some messing up is here, this value identifies the csv
         df_path = os.path.join(data_dir, f'{ID}.csv')
         df = load(df_path, 'date', True)
-        x = np.array(df).astype(np.float32)
+        df = df.drop('date', axis=1)  # i decided to drop the date again because i cannot convert it to float32 and i still have DOY for identification
+        x = np.array(df).astype(np.float32) # create a new numpy array from the loaded csv file containing spectral values with the dataype float32
         # use 0 padding make sequence length equal
         padding = np.zeros((max_len - x.shape[0], x.shape[1]))
-        x = np.concatenate((x, padding), dtype=np.float32)
-        y = row[3]
+        x = np.concatenate((x, padding), dtype=np.float32) # the 0s are appended to the end, will need to change this in the future to fill in missing observations
+        y = info[2] # this is the label
         x_list.append(x)
         y_list.append(y)
     # concatenate array list

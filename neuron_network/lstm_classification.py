@@ -73,14 +73,12 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tenso
     y_data = y_data.reshape(-1)
     x_set = torch.from_numpy(x_data)
     y_set = torch.from_numpy(y_data)
-
     # standardization
     # sz, seq = x_set.size(0), x_set.size(1)
     # x_set = x_set.view(-1, num_bands)
     # batch_norm = nn.BatchNorm1d(num_bands)
     # x_set: Tensor = batch_norm(x_set)
     # x_set = x_set.view(sz, seq, num_bands).detach()
-
     return x_set, y_set
 
 def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
@@ -91,11 +89,9 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.D
     train_size, val_size = round(0.8 * size), round(0.2 * size)
     generator = torch.Generator() # this is for random sampling
     train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
-
     # Create PyTorch data loaders from the datasets
     train_loader = Data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     val_loader = Data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-
     # num_workers is for parallelizing this function
     # shuffle is True so data will be shuffled in every epoch, this probably is activated to decrease overfitting
     # make sure, this does not mess up the proportions of labels
@@ -129,6 +125,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '
         .format(epoch+1, EPOCH, train_loss, acc * 100), end="")
     return train_loss, acc
+
 def validate(model:nn.Module) -> Tuple[float, float]:
     model.eval()
     with torch.no_grad():
@@ -184,15 +181,12 @@ if __name__ == "__main__":
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     print("Current Time =", current_time)
-
     labels = csv.balance_labels(LABEL_PATH)
     x_data, y_data = csv.to_numpy(DATA_DIR, labels)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
-
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     print("Current Time =", current_time)
-
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
     model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)

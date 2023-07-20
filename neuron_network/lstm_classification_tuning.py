@@ -12,19 +12,28 @@ from models.lstm import LSTMClassifier
 import utils.validation as val
 import utils.plot as plot
 from datetime import datetime
-import ray # for automization of hyperparameter tuning
+import argparse
 from sklearn.model_selection import train_test_split # for splitting the dataset in a stratified way
 
+parser = argparse.ArgumentParser(description='trains LSTM given parameters')
+parser.add_argument('UID', type=int, help='the unique ID of this particular model')
+parser.add_argument('GPU_NUM', type=int, help='which GPU to use, necessary for parallelization')
+parser.add_argument('input_size', type=int, help='input size')
+parser.add_argument('hidden_size', type=int, help='hidden layer size')
+parser.add_argument('num_layers', type=int, help='number of layers')
+parser.add_argument('bidirectional', type=bool, help='True = bidirectional, False = normal onedirectional LSTM')
 
-# file path
-PATH='/home/j/data/'
-DATA_DIR = os.path.join(PATH, 'subset/')
-LABEL_CSV = 'labels_unbalanced.csv'
-MODEL = 'bi-lstm'
-UID = 'demo'
+args = parser.parse_args()
+
+# settings
+PATH='/scratch/jonathak90/'
+DATA_DIR = os.path.join(PATH, 'balanced_subset2')
+LABEL_CSV = 'labels_clean.csv'
+MODEL = 'lstm'
+UID = args.UID
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, LABEL_CSV)
-MODEL_PATH = '/home/j/data/bi-lstm_unbalanced.pth' #  TODO fix these joins
+MODEL_PATH = '/home/jonathak90/outputs/models/'+MODEL_NAME+'.pth' #  TODO fix these joins
 
 # general hyperparameters
 BATCH_SIZE = 512
@@ -32,13 +41,14 @@ LR = 0.001
 EPOCH = 200
 SEED = 24
 
-# hyperparameters for LSTM
+# fixed settings:
 num_bands = 10 # number of columns in csv files
-input_size = 64 # larger
-hidden_size = 128 # larger
-num_layers = 3 # larger
-num_classes = 10 # number of different labels todo: can i automate this by reading in unique labels?
-bidirectional = True
+
+# hyperparameters for LSTM and argparse
+input_size = args.input_size # larger
+hidden_size = args.hidden_size # larger
+num_layers = args.num_layers # larger
+bidirectional = args.bidirectional
 
 
 def save_hyperparameters() -> None:
@@ -58,30 +68,29 @@ def save_hyperparameters() -> None:
             'number of classes': num_classes
         }
     }
-    # out_path = os.path.join(os.path.join(PATH,'/outputs/models/'),MODEL_NAME,'params.json') TODO: get this to work
-    out_path = os.path.join('/home/admin/jonathan/outputs/models/',MODEL_NAME,'params.json')
+    out_path = os.path.join('/home/jonathak90/outputs/models/',MODEL_NAME,'params.json')
     with open(out_path, 'w') as f:
         data = json.dumps(params, indent=4)
         f.write(data)
     print('saved hyperparameters')
+
 def setup_seed(seed:int) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
+
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
     """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     # reduce dimension from (n, 1) to (n, )
     y_data = y_data.reshape(-1)
     x_set = torch.from_numpy(x_data)
     y_set = torch.from_numpy(y_data)
-
     # standardization
-    # sz, seq = x_set.size(0), x_set.size(1)
-    # x_set = x_set.view(-1, num_bands)
-    # batch_norm = nn.BatchNorm1d(num_bands)
-    # x_set: Tensor = batch_norm(x_set)
-    # x_set = x_set.view(sz, seq, num_bands).detach()
-
+    sz, seq = x_set.size(0), x_set.size(1) # retrieve amount of samples and sequence length from tensor object
+    x_set = x_set.view(-1, num_bands) # WTF does this do?
+    batch_norm = nn.BatchNorm1d(num_bands)
+    x_set: Tensor = batch_norm(x_set)
+    x_set = x_set.view(sz, seq, num_bands).detach()
     return x_set, y_set
 
 def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader]:
@@ -92,11 +101,9 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.D
     train_size, val_size = round(0.8 * size), round(0.2 * size)
     generator = torch.Generator() # this is for random sampling
     train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
-
     # Create PyTorch data loaders from the datasets
     train_loader = Data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     val_loader = Data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-
     # num_workers is for parallelizing this function
     # shuffle is True so data will be shuffled in every epoch, this probably is activated to decrease overfitting
     # make sure, this does not mess up the proportions of labels
@@ -130,6 +137,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '
         .format(epoch+1, EPOCH, train_loss, acc * 100), end="")
     return train_loss, acc
+
 def validate(model:nn.Module) -> Tuple[float, float]:
     model.eval()
     with torch.no_grad():
@@ -155,38 +163,35 @@ def validate(model:nn.Module) -> Tuple[float, float]:
     print('| Validation Loss: {:.4f} | Validation Accuracy: {:.2f}%'
         .format(val_loss, 100 * acc))
     return val_loss, acc
-def test(model:nn.Module) -> None:
+
+def test(model:nn.Module, classes) -> None:
     """Test best model"""
     model.eval()
     with torch.no_grad():
         y_true = []
         y_pred = []
         for (inputs, labels) in val_loader:
-            inputs = inputs[:, :, 1:11]
-            # print(inputs)
-            # print(labels)
+            inputs = inputs[:, :, 1:11] # this excludes DOY and date
             inputs:Tensor = inputs.to(device)
             labels:Tensor = labels.to(device)
             outputs:Tensor = model(inputs)  # again, this is where it somehow fails
             _, predicted = torch.max(outputs.data, 1)
             y_true += labels.tolist()
             y_pred += predicted.tolist()
-        # *************************change class here*************************
-        classes = ['0', '1', '2', '3', '4','5', '6', '7', '8', '9'] # todo: can i automate this by reading in unique labels?
-        # *******************************************************************
+        classes = range(classes)
         plot.draw_confusion_matrix(y_true, y_pred, classes, MODEL_NAME)
 
 if __name__ == "__main__":
     # set random seed
     setup_seed(SEED)
     # Device configuration
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:'+args.GPU_NUM if torch.cuda.is_available() else 'cpu')
     # dataset
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     print("Current Time =", current_time)
-
     labels = csv.balance_labels_subset(LABEL_PATH, DATA_DIR)
+    num_classes = 10  # number of different labels
     x_data, y_data = csv.to_numpy_subset(DATA_DIR, labels)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
 
@@ -237,4 +242,4 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(MODEL_PATH))
     # test(model)
     print('plot results successfully')
-    torch.save(model, '/home/admin/jonathan/outputs/models/bi-lstm_demo.pkl')
+    torch.save(model, '/home/jonathak90/outputs/models/bi-lstm_demo.pkl')
