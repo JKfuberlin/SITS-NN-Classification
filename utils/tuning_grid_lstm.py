@@ -1,4 +1,5 @@
 import json
+import itertools
 
 # Define the possible values for each argument
 input_sizes = [64, 128, 256]
@@ -10,8 +11,5 @@ bidirectional = [True, False]
 grid = list(itertools.product(input_sizes, hidden_sizes, num_layers, bidirectional))
 
 # Save the grid to a file
-with open('/home/admin/jonathan/TSC_CNN/grid.json', 'w') as f:
+with open('/home/j/data/tuning_grid.json', 'w') as f:
     json.dump(grid, f)
-
-
-

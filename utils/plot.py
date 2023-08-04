@@ -3,9 +3,9 @@ from matplotlib.ticker import MaxNLocator
 from sklearn.metrics import confusion_matrix, r2_score
 import pandas as pd
 from typing import List
+import os
 
-
-def draw_curve(y_train:List[float], y_val:List[float], name:str, method:str, model:str) -> None:
+def draw_curve(y_train:list[float], y_val:list[float], name:str, method:str, model:str) -> None:
     """
     Visualise the change of loss or accuracy over epochs
     @params:
@@ -18,19 +18,24 @@ def draw_curve(y_train:List[float], y_val:List[float], name:str, method:str, mod
     epoch = len(y_train)
     x = [i for i in range(0, epoch)]
     # plot 2 curves
-    plt.plot(x, y_train, color='b', label='train '+name)
-    plt.plot(x, y_val, color='y', label="validation "+name)
+    plt.plot(x, y_train, color='b', label='train ' + name)
+    plt.plot(x, y_val, color='y', label="validation " + name)
     # set label
     plt.xlabel("Epoch")
     plt.ylabel("Value")
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     # set title and legend
-    title = f'{model} {name}'
+    title = f'{model}_{name}'
     plt.title(title)
     plt.legend()
+    # create the directory if it doesn't exist
+    output_dir = os.path.expanduser('~/data/outputs/plots/')
+    os.makedirs(output_dir, exist_ok=True)
     # save figure and clear
-    plt.savefig(f'../outputs/pics/{method}/{title}.jpg')
+    save_path = os.path.join(output_dir, f'{title}.jpg')
+    plt.savefig(save_path)
     plt.clf()
+    print("Saved plot at:", os.path.abspath(save_path))
 
 
 def draw_confusion_matrix(y_true:List[int], y_pred:List[int], classes:List[str], model:str) -> None:

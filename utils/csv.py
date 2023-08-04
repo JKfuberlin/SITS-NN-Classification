@@ -59,7 +59,7 @@ def subset_filenames(data_dir:str):
     file_names = [int(x) for x in file_names]
     return file_names
 
-def balance_labels_subset(label_path:str, data_dir:str):
+def balance_labels_subset(label_path:str, data_dir:str, balance:bool):
     file_names = subset_filenames(data_dir)
     labels = pd.read_csv(label_path, sep=',', header=0, index_col=False) # this loads all labels from the csv file
     try:
@@ -73,14 +73,17 @@ def balance_labels_subset(label_path:str, data_dir:str):
     minority_label = label_counts.idxmin()  # Get the label with the least occurrences
     minority_count = label_counts[minority_label] # Get the number of occurrences of the minority label
     labels = labels_subset # just resetting the variable name
-    dfs = [] # empty list
-    for label in label_counts.index:
-        label_df = labels[labels["encoded"] == label]
-        if len(label_df) > minority_count:
-            label_df = label_df.sample(minority_count, random_state=42)
-        dfs.append(label_df)
-    # Concatenate the dataframes
-    balanced_df = pd.concat(dfs)
+    if balance == True:
+        dfs = [] # empty list
+        for label in label_counts.index:
+            label_df = labels[labels["encoded"] == label]
+            if len(label_df) > minority_count:
+                label_df = label_df.sample(minority_count, random_state=42)
+            dfs.append(label_df)
+        # Concatenate the dataframes
+        balanced_df = pd.concat(dfs)
+    else:
+        balanced_df = labels
     # Shuffle the dataframe
     balanced_df = balanced_df.sample(frac=1, random_state=42)
     return balanced_df
