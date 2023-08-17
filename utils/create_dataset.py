@@ -10,6 +10,14 @@ DATA_DIR = os.path.join(PATH, 'microdose/')
 LABEL_CSV = 'labels_clean.csv'
 LABEL_PATH = os.path.join(PATH, LABEL_CSV)
 
+year = 2022                     # single, recent year
+year = 2020:2022                # short, recent time series without drought year
+year = 2018:2022                # recent time series including drought years
+year = 2015:2017+2020:2022      # entire time series without drought years
+year = 2015:2022                # entire time series including drought years
+
+
+
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> tuple[Tensor, Tensor]:
     """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     y_data = y_data.reshape(-1) # This reshapes the y_data numpy array from a 2-dimensional array with shape (n, 1) to a 1-dimensional array with shape (n, ).

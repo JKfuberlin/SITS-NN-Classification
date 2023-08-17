@@ -18,7 +18,7 @@ class LSTMClassifier(nn.Module):
         self.fc = nn.Sequential(
                     nn.Linear(self.D * hidden_size, 256), # hidden layer 1, amount of neurons in input layer get reduced to 256
                     nn.ReLU(), # activation function
-                    nn.BatchNorm1d(256),
+                    nn.BatchNorm1d(256), # mal rausnehmen
                     nn.Dropout(0.3), # dropping units at random to prevent overfitting
                     nn.Linear(256, num_classes), # hidden layer 2
                     nn.Softmax(dim=1) # final layer to calculate probablitiy for each class

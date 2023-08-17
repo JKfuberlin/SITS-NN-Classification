@@ -25,7 +25,7 @@ def draw_curve(y_train:list[float], y_val:list[float], name:str, method:str, mod
     plt.ylabel("Value")
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     # set title and legend
-    title = f'{model}_{name}'
+    title = f'{model}_{name}_{uid}'
     plt.title(title)
     plt.legend()
     # create the directory if it doesn't exist
@@ -38,7 +38,7 @@ def draw_curve(y_train:list[float], y_val:list[float], name:str, method:str, mod
     print("Saved plot at:", os.path.abspath(save_path))
 
 
-def draw_confusion_matrix(y_true:List[int], y_pred:List[int], classes:List[str], model:str) -> None:
+def draw_confusion_matrix(y_true:List[int], y_pred:List[int], classes:List[str], model:str, uid:str) -> None:
     """Draw consufion matrix to visualise classification result"""
     assert len(y_pred) == len(y_true), "y_true and y_pred must have the same length"
     # calculate confusion matrix
@@ -60,7 +60,7 @@ def draw_confusion_matrix(y_true:List[int], y_pred:List[int], classes:List[str],
     plt.xlabel('Predicted label')
     plt.title(title)
     # save figure and clear
-    plt.savefig('../outputs/pics/classification/'+ title +'.jpg')
+    plt.savefig('../outputs/pics/classification/'+ title +'_'+ uid +'.jpg')
     plt.clf()
 
 

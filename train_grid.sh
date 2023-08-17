@@ -14,7 +14,8 @@ while IFS= read -r combo; do
     input_size=$(echo "$combo" | python -c "import json, sys; print(json.loads(sys.stdin.read())[0])")
     hidden_size=$(echo "$combo" | python -c "import json, sys; print(json.loads(sys.stdin.read())[1])")
     num_layers=$(echo "$combo" | python -c "import json, sys; print(json.loads(sys.stdin.read())[2])")
-    bidirectional=$(echo "$combo" | python -c "import json, sys; print(json.loads(sys.stdin.read())[3])")
+    batch_size=$(echo "$combo" | python -c "import json, sys; print(json.loads(sys.stdin.read())[3])")
+    bidirectional=$(echo "$combo" | python -c "import json, sys; print(json.loads(sys.stdin.read())[4])")
 
      # Display the current combination of arguments
     echo "Running with arguments:"
@@ -22,6 +23,7 @@ while IFS= read -r combo; do
     echo "input_size: $input_size"
     echo "hidden_size: $hidden_size"
     echo "num_layers: $num_layers"
+    echo "batch_size: $batch_size"
     echo "bidirectional: $bidirectional"
 
 

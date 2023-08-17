@@ -11,7 +11,7 @@ import multiprocessing # for parallelization
 from shapely.geometry import mapping # for clipping
 from rasterio.transform import from_origin # for assigning an origin to the created map
 
-tiles = np.loadtxt('/my_volume/BW_tiles.txt', dtype=str) # this file contains the XY tile names of my AOI in the same format as FORCE
+# tiles = np.loadtxt('/my_volume/BW_tiles.txt', dtype=str) # this file contains the XY tile names of my AOI in the same format as FORCE
 
 device = torch.device('cpu') # assigning cpu for inference
 model_pkl = torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu')) # loading the trained model
@@ -22,6 +22,8 @@ def predict(input):
     return predicted
 
 raster_paths = []
+
+tile ="X0067_Y0058" # Landshut
 
 for tile in tiles:
     s2dir = glob.glob(('/force/FORCE/C1/L2/ard/'+tile+'/'), recursive=True) # Initialize path to Sentinel-2 time series
@@ -62,7 +64,7 @@ for tile in tiles:
 
 # testing for a single tile
 
-tile = tiles[14]
+tile ="X0067_Y0058" # Landshut
 s2dir = glob.glob(('/force/FORCE/C1/L2/ard/' + tile + '/'), recursive=True)  # Initialize path to Sentinel-2 time series
 raster_paths = []  # create object to be filled with rasters to be stacked
 tifs = glob.glob(os.path.join(s2dir[0], "*SEN*BOA.tif"))  # i want to ignore the landsat files and stack only sentinel 2 bottom of atmosphere observations
@@ -71,23 +73,25 @@ years = [int(re.search(r"\d{8}", raster_path).group(0)) for raster_path in raste
 raster_paths = [raster_path for raster_path, year in zip(raster_paths, years) if year <= 20230302]  # ... to cut off at last image 20230302 as i trained my model with this sequence length, this might change in the future with transformers
 datacube = [rxr.open_rasterio(raster_path) for raster_path in raster_paths]  # i user rxr because the clip function from rasterio sucks
 # the datacube is too large for the RAM of my contingent so i need to subset using the 5x5km tiles
-grid_tiles = glob.glob(os.path.join('/my_volume/FORCE_tiles_subset_BW/', '*' + tile + '*.gpkg'))
-
+# grid_tiles = glob.glob(os.path.join('/my_volume/FORCE_tiles_subset_BW/', '*' + tile + '*.gpkg'))
+grid_tiles = '/my_volume/31.gpkg'
 # checking workflow:
 
-minitile = grid_tiles[0]
+minitile = grid_tiles
 crop_shape = gpd.read_file(minitile)
 clipped_datacube = [] # empty object for adding clipped rasters
 
+iti = 1
+total = str(len(datacube))
 for raster in datacube:  # clip the rasters using the geometry
-    print(minitile)
     crop_shape = gpd.read_file(minitile)
+    print('cropping ' + str(iti) + ' out of ' + total)
+    iti = iti + 1
     try:
-        print('yes')
         clipped_raster = raster.rio.clip(crop_shape.geometry.apply(mapping))
         clipped_datacube.append(clipped_raster)
     except:
-        print('no')
+        print('not working')
         break
 
 datacube_np = np.array(clipped_datacube, ndmin = 4) # this is now a clipped datacube for the first minitile, fixing it to be 4 dimensions
@@ -136,5 +140,5 @@ metadata = {
     'transform': from_origin(origin[0], origin[1], 10, 10)  # Set the origin and pixel size (assumes each pixel is 1 unit)
 }
 
-with rasterio.open(os.path.join('/my_volume/', 'example.tif'), 'w', **metadata) as dst:
+with rasterio.open(os.path.join('/my_volume/', 'landshut_example2.tif'), 'w', **metadata) as dst:
     dst.write_band(1, map.astype(rasterio.float32))

@@ -9,51 +9,61 @@ sys.path.append('../')
 from models.lstm import LSTMClassifier
 import utils.validation as val
 import utils.plot as plot
+from utils.pytorchtools import EarlyStopping
 from datetime import datetime
 import argparse
 
 local = True
+parse = False
 
-parser = argparse.ArgumentParser(description='trains LSTM given parameters')
-parser.add_argument('UID', type=int, help='the unique ID of this particular model')
-# parser.add_argument('GPU_NUM', type=int, help='which GPU to use, necessary for parallelization')
-parser.add_argument('input_size', type=int, help='input size')
-parser.add_argument('hidden_size', type=int, help='hidden layer size')
-parser.add_argument('num_layers', type=int, help='number of layers')
-parser.add_argument('bidirectional', type=bool, help='True = bidirectional, False = normal onedirectional LSTM')
+if parse == True:
+    parser = argparse.ArgumentParser(description='trains LSTM given parameters')
+    parser.add_argument('UID', type=int, help='the unique ID of this particular model')
+    # parser.add_argument('GPU_NUM', type=int, help='which GPU to use, necessary for parallelization')
+    parser.add_argument('input_size', type=int, help='input size')
+    parser.add_argument('hidden_size', type=int, help='hidden layer size')
+    parser.add_argument('num_layers', type=int, help='number of layers')
+    parser.add_argument('batch_size', type=int, help='batch size')
+    parser.add_argument('bidirectional', type=bool, help='True = bidirectional, False = normal onedirectional LSTM')
+    args = parser.parse_args()
+    # hyperparameters for LSTM and argparse
+    input_size = args.input_size  # larger
+    hidden_size = args.hidden_size  # larger
+    num_layers = args.num_layers  # larger
+    bidirectional = args.bidirectional
+    BATCH_SIZE = args.batch_size
+    UID = args.UID
 
-args = parser.parse_args()
+print(f"UID = {UID}")
+
+else:
+    UID = 1
+    input_size = 64 # according to GPT, this should not really be tuned but match the data structure
+    hidden_size = 128
+    num_layers = 3
+    bidirectional = True
+    BATCH_SIZE = 512
 
 # general hyperparameters
-BATCH_SIZE = 512
 LR = 0.001
-EPOCH = 200
+EPOCH = 420
 SEED = 420
+patience = 1
+# early stopping patience; how long to wait after last time validation loss improved.
 
 if local == True:
     PATH = '/home/j/data/'
     MODEL = 'LSTM'
-    MODEL_NAME = MODEL + '_' + UID
+    MODEL_NAME = MODEL + '_' + str(UID)
     MODEL_PATH = '/home/j/data/outputs/models/' + MODEL_NAME   # TODO fix these joins
-    EPOCH = 5
+    EPOCH = 20
+    x_set = torch.load('/home/j/data/x_set.pt')
+    y_set = torch.load('/home/j/data/y_set.pt')
+
 
 # fixed settings:
 num_bands = 10 # number of columns in csv files
 num_classes = 10  # number of different labels / different tree species classes in data
-
-# hyperparameters for LSTM and argparse
-input_size = args.input_size # larger
-hidden_size = args.hidden_size # larger
-num_layers = args.num_layers # larger
-bidirectional = args.bidirectional
-
-input_size = 64
-hidden_size = 128
-num_layers = 3
-bidirectional = True
-
-x_set = torch.load('/home/j/data/x_set.pt')
-y_set = torch.load('/home/j/data/y_set.pt')
 
 def save_hyperparameters() -> None:
     """Save hyperparameters into a json file"""
@@ -72,7 +82,7 @@ def save_hyperparameters() -> None:
             'number of classes': num_classes
         }
     }
-    out_path = MODEL_PATH+'params.json'
+    out_path = MODEL_PATH+UID+'params.json'
     with open(out_path, 'w') as f:
         data = json.dumps(params, indent=4)
         f.write(data)
@@ -94,9 +104,9 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> tuple[Data.D
     generator = torch.Generator() # this is for random sampling
     train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
     # Create PyTorch data loaders from the datasets
-    train_loader = Data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-    val_loader = Data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-    # num_workers is for parallelizing this function
+    train_loader = Data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+    val_loader = Data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+    # num_workers is for parallelizing this function, however i need to set it to 1 on the HPC
     # shuffle is True so data will be shuffled in every epoch, this probably is activated to decrease overfitting
     # TODO: make sure, this does not mess up the proportions of classes seen by the training.
     return train_loader, val_loader
@@ -159,7 +169,7 @@ def validate(model:nn.Module) -> tuple[float, float]:
 
 def timestamp():
     now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
+    current_time = now.strftime("%D:%H:%M:%S")
     print("Current Time =", current_time)
 
 if __name__ == "__main__":
@@ -187,6 +197,8 @@ if __name__ == "__main__":
     # train and validate model
     print("start training")
     timestamp()
+    # initialize the early_stopping object
+    early_stopping = EarlyStopping(patience=patience, verbose=True)
     for epoch in range(EPOCH):
         # print(epoch)
         train_loss, train_acc = train(model, epoch)
@@ -198,6 +210,10 @@ if __name__ == "__main__":
         train_epoch_acc.append(train_acc)
         val_epoch_loss.append(val_loss)
         val_epoch_acc.append(val_acc)
+        early_stopping(val_loss, model)
+        if early_stopping.early_stop:
+            print("Early stopping in epoch " + epoch)
+            break
     # visualize loss and accuracy during training and validation
     model.load_state_dict(torch.load(MODEL_PATH))
     plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss',method='LSTM', model=MODEL_NAME)
