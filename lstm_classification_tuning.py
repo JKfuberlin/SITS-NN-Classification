@@ -32,9 +32,8 @@ if parse == True:
     num_layers = args.num_layers  # larger
     bidirectional = args.bidirectional
     BATCH_SIZE = args.batch_size
-    UID = args.UID
-
-print(f"UID = {UID}")
+    UID = str(args.UID)
+    print(f"UID = {UID}")
 
 else:
     UID = 1
@@ -48,7 +47,7 @@ else:
 LR = 0.001
 EPOCH = 420
 SEED = 420
-patience = 1
+patience = 25
 # early stopping patience; how long to wait after last time validation loss improved.
 
 if local == True:
@@ -82,11 +81,14 @@ def save_hyperparameters() -> None:
             'number of classes': num_classes
         }
     }
-    out_path = MODEL_PATH+UID+'params.json'
+    out_path = MODEL_PATH+'_params.json'
     with open(out_path, 'w') as f:
         data = json.dumps(params, indent=4)
         f.write(data)
     print('saved hyperparameters')
+
+
+
 
 def setup_seed(seed:int) -> None:
     torch.manual_seed(seed)
@@ -181,12 +183,6 @@ if __name__ == "__main__":
     # model
     model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
     save_hyperparameters()
-    # loss and optimizer
-    # ******************change number of samples here******************
-    # samples = torch.tensor([643, 254, 327, 1434])
-    # mx = max(samples)
-    # weight = torch.tensor([1., 1., 1., 1.1, 1.])
-    # *****************************************************************
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
     # evaluate terms
@@ -205,6 +201,7 @@ if __name__ == "__main__":
         val_loss, val_acc = validate(model)
         if val_acc > min(val_epoch_acc):
             torch.save(model.state_dict(), MODEL_PATH)
+            best_acc = val_acc
         # record loss and accuracy
         train_epoch_loss.append(train_loss)
         train_epoch_acc.append(train_acc)
@@ -212,12 +209,13 @@ if __name__ == "__main__":
         val_epoch_acc.append(val_acc)
         early_stopping(val_loss, model)
         if early_stopping.early_stop:
-            print("Early stopping in epoch " + epoch)
+            print("Early stopping in epoch " + str(epoch))
+            print("validation loss: " + str(best_acc))
             break
     # visualize loss and accuracy during training and validation
     model.load_state_dict(torch.load(MODEL_PATH))
-    plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss',method='LSTM', model=MODEL_NAME)
-    plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy',method='LSTM', model=MODEL_NAME)
+    plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss',method='LSTM', model=MODEL_NAME, uid=UID)
+    plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy',method='LSTM', model=MODEL_NAME, uid=UID)
     timestamp()
     # test(model)
     print('plot results successfully')

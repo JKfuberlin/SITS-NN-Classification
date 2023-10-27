@@ -28,7 +28,7 @@ while IFS= read -r combo; do
 
 
     # Call the Python script with the argument values
-    python /home/j/PycharmProjects/TSC_CNN/lstm_classification_tuning.py "$UID" "$input_size" "$hidden_size" "$num_layers" "$bidirectional"
+    python /home/j/PycharmProjects/TSC_CNN/lstm_classification_tuning.py "$uid_counter" "$input_size" "$hidden_size" "$num_layers"  "$batch_size" "$bidirectional"
 
     uid_counter=$((uid_counter + 1))
 

@@ -5,7 +5,7 @@ import pandas as pd
 from typing import List
 import os
 
-def draw_curve(y_train:list[float], y_val:list[float], name:str, method:str, model:str) -> None:
+def draw_curve(y_train:list[float], y_val:list[float], name:str, method:str, model:str, uid:str) -> None:
     """
     Visualise the change of loss or accuracy over epochs
     @params:
