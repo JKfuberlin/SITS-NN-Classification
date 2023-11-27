@@ -52,14 +52,17 @@ python apps/inference.py --help
 
 # usage: inference.py [-h] -w WEIGHTS --input-tiles INPUT --input-dir BASE --output-dir OUT --date-cutoff DATE [--chunk-size CHUNK] [--log] [--log-file LOG-FILE]
 # 
+# Run inference with already trained LSTM classifier on a remote-sensing time series represented as FORCE ARD datacube.
+# 
 # optional arguments:
 #   -h, --help            show this help message and exit
 #   -w WEIGHTS, --weights WEIGHTS
-#   --input-tiles INPUT
-#   --input-dir BASE
-#   --output-dir OUT
-#   --date-cutoff DATE
-#   --chunk-size CHUNK
-#   --log
-#   --log-file LOG-FILE
+#                         Path to pre-trained classifier to be loaded via `torch.load`. Can be either a relative or absolute file path.
+#   --input-tiles INPUT   List of FORCE tiles which should be used for inference. Each line should contain one FORCE tile specifier (Xdddd_Ydddd).
+#   --input-dir BASE      Path to FORCE datacube.
+#   --output-dir OUT      Path to directory into which predictions should be saved.
+#   --date-cutoff DATE    Cutoff date for time series which should be included in datacube for inference.
+#   --chunk-size CHUNK    Chunk size which further subsets FORCE tiles for RAM-friendly prediction.
+#   --log                 Emit logs?
+#   --log-file LOG-FILE   If logging is enabled, write to this file. If omitted, logs are written to stdout.
 ```
