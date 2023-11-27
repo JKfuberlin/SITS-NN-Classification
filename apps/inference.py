@@ -1,4 +1,3 @@
-# TODO needless data type conversion when saving output image?
 # TODO package models into a library so that importing is easier -> requires re-training, if I'm not mistaken
 # TODO fix GPU inference: https://stackoverflow.com/questions/71278607/pytorch-expected-all-tensors-on-same-device
 # TODO try inference with 500 pixel by 500 pixel size
@@ -74,11 +73,11 @@ for tile in FORCE_tiles:
         tile_path for tile_path in tile_paths if int(search(r"\d{8}", tile_path).group(0)) <= cli_args.get("date")
     ]
 
-    # TODO there may exist an easier solution than opening an image from my tile stack
     with rasterio.open(cube_inputs[0]) as f:
         metadata = f.meta
         metadata["count"] = 1
-        metadata["dtype"] = rasterio.float32
+        metadata["dtype"] = rasterio.uint8
+        metadata["nodata"] = 0
 
     assert metadata['height'] % 2 == 0 and metadata['width'] % 2 == 0
 
@@ -103,9 +102,6 @@ for tile in FORCE_tiles:
             logging.info(f"Permuting torch tensor")
             s2_cube_prediction: torch.tensor = s2_cube_torch.permute(2, 3, 0, 1)
 
-            # TODO why not use smaller image tiles as input? is the lstm fixed to a certain input length?
-            #  alternatively: below, the prediction is done row-wise per tile. The clipping should not matter in that
-            #  case!
             for chunk_rows in range(0, cli_args.get("chunk")):
                 start_row: float = time()
                 output_torch[row + chunk_rows, col:col + cli_args.get("chunk")] = predict(lstm, s2_cube_prediction[chunk_rows])
@@ -117,9 +113,8 @@ for tile in FORCE_tiles:
 
     output_numpy: np.array = output_torch.numpy()
 
-    # TODO save as int not float
     with rasterio.open(cli_args.get("out") / (tile + ".tif"), 'w', **metadata) as dst:
-        dst.write_band(1, output_numpy.astype(rasterio.float32))
+        dst.write_band(1, output_numpy.astype(rasterio.uint8))
 
     logging.info(f"Processed tile {tile} in {time() - start} seconds")
 
