@@ -61,6 +61,7 @@ class PositionalEncoding(nn.Module):
     x = x + self.pe[:x.size(0), :] adds the positional encoding to the input sequence.
     self.dropout(x) applies dropout to the resulting tensor. This is the dropout introduced during the initialization of the PositionalEncoding module.
         """
+
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 

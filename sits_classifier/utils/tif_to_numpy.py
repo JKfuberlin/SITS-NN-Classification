@@ -9,7 +9,7 @@ import torch # for loading the model and actual inference
 import rioxarray as rxr # for raster clipping
 
 import multiprocessing # for parallelization
-from models.lstm import LSTMClassifier
+from sits_classifier.models.lstm import LSTMClassifier
 
 import sys # for getting object size
 from shapely.geometry import mapping
@@ -91,7 +91,7 @@ num_cores = 15
 pool = multiprocessing.Pool(processes=num_cores)
 
 # Iterate over the range in parallel and store the results in a list
-predictions = pool.map(predict, data_for_prediction)
+predictions = pool.output_map(predict, data_for_prediction)
 
 # Close the pool to release resources
 pool.close()

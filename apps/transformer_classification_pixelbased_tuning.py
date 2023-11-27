@@ -6,53 +6,56 @@ import sys
 import json
 from typing import Tuple
 sys.path.append('../')
-from models.lstm import LSTMClassifier
+from models.transformer import TransformerClassifier
 import utils.validation as val
 import utils.plot as plot
 from utils.pytorchtools import EarlyStopping
 from datetime import datetime
 import argparse
+import os # for creating dirs if needed
 
 local = True
 parse = False
 
 if parse == True:
-    parser = argparse.ArgumentParser(description='trains LSTM given parameters')
+    parser = argparse.ArgumentParser(description='trains the Transformer with given parameters')
     parser.add_argument('UID', type=int, help='the unique ID of this particular model')
     # parser.add_argument('GPU_NUM', type=int, help='which GPU to use, necessary for parallelization')
-    parser.add_argument('input_size', type=int, help='input size')
-    parser.add_argument('hidden_size', type=int, help='hidden layer size')
+    parser.add_argument('d_model', type=int, help='d_model')
+    parser.add_argument('nhead', type=int, help='number of transformer heads')
     parser.add_argument('num_layers', type=int, help='number of layers')
+    parser.add_argument('dim_feedforward', type=int, help='')
     parser.add_argument('batch_size', type=int, help='batch size')
-    parser.add_argument('bidirectional', type=bool, help='True = bidirectional, False = normal onedirectional LSTM')
     args = parser.parse_args()
     # hyperparameters for LSTM and argparse
-    input_size = args.input_size  # larger
-    hidden_size = args.hidden_size  # larger
+    d_model = args.d_model  # larger
+    nhead = args.nhead  # larger
     num_layers = args.num_layers  # larger
-    bidirectional = args.bidirectional
+    dim_feedforward = args.dim_feedforward
     BATCH_SIZE = args.batch_size
     UID = str(args.UID)
     print(f"UID = {UID}")
 
 else:
-    UID = 1
-    input_size = 64 # according to GPT, this should not really be tuned but match the data structure
-    hidden_size = 128
-    num_layers = 3
-    bidirectional = True
-    BATCH_SIZE = 512
+    d_model = 128
+    nhead = 8
+    num_layers = 2
+    dim_feedforward = 512
+    BATCH_SIZE = 305
+
 
 # general hyperparameters
-LR = 0.001
-EPOCH = 420
-SEED = 420
-patience = 25
-# early stopping patience; how long to wait after last time validation loss improved.
+LR = 0.001 # learning rate, which in theory could be within the scope of parameter tuning
+EPOCH = 420 # the maximum amount of epochs i want to train
+SEED = 420 # a random seed for reproduction, at some point i should try different random seeds to exclude (un)lucky draws
+patience = 25 # early stopping patience; how long to wait after last time validation loss improved.
+num_bands = 10 # number of different bands
+num_classes = 10 # the number of different classes that are supposed to be distinguished
 
 if local == True:
+    UID = 1
     PATH = '/home/j/data/'
-    MODEL = 'LSTM'
+    MODEL = 'Transformer'
     MODEL_NAME = MODEL + '_' + str(UID)
     MODEL_PATH = '/home/j/data/outputs/models/' + MODEL_NAME   # TODO fix these joins
     EPOCH = 20
@@ -70,24 +73,24 @@ def save_hyperparameters() -> None:
         'general hyperparameters': {
             'batch size': BATCH_SIZE,
             'learning rate': LR,
-            'epoch#': EPOCH,
+            'epoch': EPOCH,
             'seed': SEED
         },
         f'{MODEL} hyperparameters': {
             'number of bands': num_bands,
-            'embedding size': input_size,
-            'hidden size': hidden_size,
+            'embedding size': d_model,
+            'number of heads': nhead,
             'number of layers': num_layers,
+            'feedforward dimension': dim_feedforward,
             'number of classes': num_classes
         }
     }
-    out_path = MODEL_PATH+'_params.json'
+    out_path = f'../../outputs/models/{MODEL_NAME}_params.json'
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, 'w') as f:
         data = json.dumps(params, indent=4)
         f.write(data)
     print('saved hyperparameters')
-
-
 
 
 def setup_seed(seed:int) -> None:
@@ -119,14 +122,14 @@ def train(model:nn.Module, epoch:int) -> tuple[float, float]:
     total = 0
     losses = []
     for i, (inputs, labels) in enumerate(train_loader):
-        inputs = inputs[:,:, 0:10] # this excludes DOY and date
-        # print(inputs)
-        # put the data in gpu
+        inputs = inputs[:,:, 0:10] # this excludes DOY and date from the x_data
+        # pass the data into the gpu
         inputs = inputs.to(device)
+        inputs = torch.permute(inputs, (1,0,2)) # for some reason i need to switcheroo the dimensions compared to LSTM to make the tensor match with the labels
         labels = labels.to(device)
         # forward pass
-        outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        outputs = model(inputs) # applying the model
+        loss = criterion(outputs, labels) # calculating loss by comparing to the y_set
         # recording training accuracy
         good_pred += val.true_pred_num(labels, outputs)
         total += labels.size(0)
@@ -181,10 +184,11 @@ if __name__ == "__main__":
     timestamp()
     train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
-    model = LSTMClassifier(num_bands, input_size, hidden_size, num_layers, num_classes, bidirectional).to(device)
+    model = TransformerClassifier(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     save_hyperparameters()
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
+    softmax = nn.Softmax(dim=1).to(device)
     # evaluate terms
     train_epoch_loss = []
     val_epoch_loss = []
