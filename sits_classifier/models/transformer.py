@@ -4,7 +4,6 @@ from torch.nn.modules.normalization import LayerNorm
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 import math
 
-
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
@@ -24,7 +23,7 @@ class PositionalEncoding(nn.Module):
         >>> pos_encoder = PositionalEncoding(d_model)
     """
 
-    def __init__(self, d_model:int, dropout=0.1, max_len=5000):
+    def __init__(self, d_model: int, dropout=0.1, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -52,7 +51,8 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerRegression(nn.Module):
-    def __init__(self, num_bands:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+    def __init__(self, num_bands: int, num_classes: int, d_model: int, nhead: int, num_layers: int,
+                 dim_feedforward: int) -> None:
         super(TransformerRegression, self).__init__()
         # encoder embedding
         self.src_embd = nn.Linear(num_bands, d_model)
@@ -63,18 +63,18 @@ class TransformerRegression(nn.Module):
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # regression
         self.fc = nn.Sequential(
-                    nn.Linear(d_model, 256),
-                    nn.ReLU(),
-                    nn.BatchNorm1d(256),
-                    nn.Dropout(0.3),
-                    nn.Linear(256, num_classes),
-                    nn.Softmax(dim=1)
-                )
+            nn.Linear(d_model, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes),
+            nn.Softmax(dim=1)
+        )
 
-    def forward(self, src:Tensor) -> Tensor:
+    def forward(self, src: Tensor) -> Tensor:
         src = self.src_embd(src)
         src = self.pos_encoder(src)
-        output:Tensor = self.transformer_encoder(src)
+        output: Tensor = self.transformer_encoder(src)
         # output: [seq_len, batch_sz, d_model]
         output = self.fc(output[-1, :, :])
         # final shape: [batch_sz, num_classes]
@@ -82,7 +82,8 @@ class TransformerRegression(nn.Module):
 
 
 class TransformerMultiLabel(nn.Module):
-    def __init__(self, num_bands:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+    def __init__(self, num_bands: int, num_classes: int, d_model: int, nhead: int, num_layers: int,
+                 dim_feedforward: int) -> None:
         super(TransformerMultiLabel, self).__init__()
         # encoder embedding
         self.src_embd = nn.Linear(num_bands, d_model)
@@ -93,18 +94,18 @@ class TransformerMultiLabel(nn.Module):
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # regression
         self.fc = nn.Sequential(
-                    nn.Linear(d_model, 256),
-                    nn.ReLU(),
-                    nn.BatchNorm1d(256),
-                    nn.Dropout(0.3),
-                    nn.Linear(256, num_classes),
-                    nn.Sigmoid()
-                )
+            nn.Linear(d_model, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes),
+            nn.Sigmoid()
+        )
 
-    def forward(self, src:Tensor) -> Tensor:
+    def forward(self, src: Tensor) -> Tensor:
         src = self.src_embd(src)
         src = self.pos_encoder(src)
-        output:Tensor = self.transformer_encoder(src)
+        output: Tensor = self.transformer_encoder(src)
         # output: [seq_len, batch_sz, d_model]
         output = self.fc(output[-1, :, :])
         # final shape: [batch_sz, num_classes]
@@ -112,7 +113,8 @@ class TransformerMultiLabel(nn.Module):
 
 
 class TransformerClassifier(nn.Module):
-    def __init__(self, num_bands:int, num_classes:int, d_model:int, nhead:int, num_layers:int, dim_feedforward:int) -> None:
+    def __init__(self, num_bands: int, num_classes: int, d_model: int, nhead: int, num_layers: int,
+                 dim_feedforward: int) -> None:
         super(TransformerClassifier, self).__init__()
         # encoder embedding
         self.src_embd = nn.Linear(num_bands, d_model)
@@ -123,15 +125,15 @@ class TransformerClassifier(nn.Module):
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         # classification
         self.fc = nn.Sequential(
-                    nn.Linear(d_model, 256),
-                    nn.ReLU(),
-                    nn.BatchNorm1d(256),
-                    nn.Dropout(0.3),
-                    nn.Linear(256, num_classes),
-                    nn.Softmax(dim=1)
-                )
+            nn.Linear(d_model, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes),
+            nn.Softmax(dim=1)
+        )
 
-    def forward(self, src:Tensor) -> Tensor:
+    def forward(self, src: Tensor) -> Tensor:
         # src: [seq_len, batch_sz, num_bands]
         src = self.src_embd(src)
         src = self.pos_encoder(src)
@@ -143,9 +145,9 @@ class TransformerClassifier(nn.Module):
 
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
-        r"""Generate a square mask for the sequence. The masked positions are filled with float('-inf').
+    r"""Generate a square mask for the sequence. The masked positions are filled with float('-inf').
             Unmasked positions are filled with float(0.0).
         """
-        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-        return mask
+    mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    return mask
