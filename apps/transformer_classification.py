@@ -4,13 +4,11 @@ from torch import nn, optim, Tensor
 import torch.utils.data as Data
 from typing import Tuple
 import os
-import sys
 import json
-sys.path.append('../')
-import utils.csv as csv
-from models.transformer import TransformerClassifier
-import utils.validation as val
-import utils.plot as plot
+import sits_classifier.utils.csv as csv
+from sits_classifier.models.transformer import TransformerClassifier
+import sits_classifier.utils.validation as val
+import sits_classifier.utils.plot as plot
 
 
 

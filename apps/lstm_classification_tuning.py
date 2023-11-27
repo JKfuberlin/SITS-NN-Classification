@@ -2,14 +2,12 @@ import numpy as np
 import torch
 from torch import nn, optim, Tensor
 import torch.utils.data as Data
-import sys
 import json
 from typing import Tuple
-sys.path.append('../')
-from models.lstm import LSTMClassifier
-import utils.validation as val
-import utils.plot as plot
-from utils.pytorchtools import EarlyStopping
+from sits_classifier.models.lstm import LSTMClassifier
+import sits_classifier.utils.validation as val
+import sits_classifier.utils.plot as plot
+from sits_classifier.utils.pytorchtools import EarlyStopping
 from datetime import datetime
 import argparse
 

@@ -1,6 +1,5 @@
-# TODO convert to stand-alone script which can be run via the command line
 # TODO needless data type conversion when saving output image?
-# TODO package models into a library so that importing is easier
+# TODO package models into a library so that importing is easier -> requires re-training, if I'm not mistaken
 # TODO fix GPU inference: https://stackoverflow.com/questions/71278607/pytorch-expected-all-tensors-on-same-device
 # TODO try inference with 500 pixel by 500 pixel size
 import argparse
@@ -68,9 +67,6 @@ def predict(model, data: torch.tensor) -> Any:
 
 for tile in FORCE_tiles:
     start: float = time()
-    #logging.info(f"Loading mask for FORCE tile {MASK_BASE_DIR / Path(LANDSHUT) / (str(MINITILE) + '.gpkg')}")
-    #minitile = gpd.read_file(MASK_BASE_DIR / Path(LANDSHUT) / (str(MINITILE) + ".gpkg"))
-
     logging.info(f"Processing FORCE tile {tile}")
     s2_tile_dir: Path = cli_args.get("base") / tile
     tile_paths: List[str] = [str(p) for p in s2_tile_dir.glob("*SEN*BOA.tif")]
@@ -113,8 +109,8 @@ for tile in FORCE_tiles:
             for chunk_rows in range(0, cli_args.get("chunk")):
                 start_row: float = time()
                 output_torch[row + chunk_rows, col:col + cli_args.get("chunk")] = predict(lstm, s2_cube_prediction[chunk_rows])
-                logging.info(f"Processed row {chunk_rows}/{cli_args.get("chunk") - 1} of "
-                             f"row-wise chunk: {row}:{row + cli_args.get("chunk") - 1}, column-wise chunk: {col}:{col + cli_args.get("chunk") - 1} "
+                logging.info(f"Processed row {chunk_rows}/{cli_args.get('chunk') - 1} of "
+                             f"row-wise chunk: {row}:{row + cli_args.get('chunk') - 1}, column-wise chunk: {col}:{col + cli_args.get('chunk') - 1} "
                              f"({tile = }) in {time() - start_chunked:.2f} seconds")
 
             logging.info(f"Processed chunk in {time() - start_chunked} seconds")
