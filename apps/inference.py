@@ -4,7 +4,6 @@
 # TODO package models into a library so that importing is easier
 # TODO fix GPU inference: https://stackoverflow.com/questions/71278607/pytorch-expected-all-tensors-on-same-device
 # TODO try inference with 500 pixel by 500 pixel size
-import sys
 from pathlib import Path
 from re import search
 from typing import List, Any, Union, Dict
@@ -14,17 +13,15 @@ import rasterio
 import rioxarray as rxr
 import torch
 import xarray
-import geopandas as gpd
-from shapely.geometry import mapping
 import logging
 from time import time
 
-import models
+from sits_classifier import models
 
-logging.basicConfig(level=logging.INFO, filename="/home/eouser/git-repos/futureforest/Eolab/runtime.txt")
+logging.basicConfig(level=logging.INFO, filename="/home/eouser/git-repos/futureforest/Eolab/inference-log.txt")
 
 INPUT_TILE_PATH: str = "/home/eouser/git-repos/futureforest/Eolab/tiles.txt"
-INPUT_WEIGHTS_PATH: str = "/home/eouser/git-repos/futureforest/Eolab/LSTM_26.pkl"
+INPUT_WEIGHTS_PATH: str = "/home/eouser/git-repos/futureforest/outputs/models/LSTM_26.pkl"
 S2_BASE_DIR: Path = Path("/force/FORCE/C1/L2/ard/")
 OUTPUT_BASE_DIR: Path = Path("/home/eouser/git-repos/futureforest/outputs/data")
 MASK_BASE_DIR: Path = Path("/home/eouser/git-repos/futureforest/FORCE_minibatches")
