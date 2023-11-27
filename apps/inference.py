@@ -92,7 +92,8 @@ for tile in FORCE_tiles:
             s2_cube: Union[xarray.Dataset, xarray.DataArray, list[xarray.Dataset]] = []
             for cube_input in cube_inputs:
                 layer: Union[xarray.Dataset, xarray.DataArray] = rxr.open_rasterio(cube_input)
-                clipped_layer = layer.isel(x=slice(row, row + cli_args.get("chunk")), y=slice(col, col + cli_args.get("chunk")))
+                clipped_layer = layer.isel(x=slice(row, row + cli_args.get("chunk")),
+                                           y=slice(col, col + cli_args.get("chunk")))
                 s2_cube.append(clipped_layer)
 
             logging.info(f"Converting chunked data cube to numpy array")
@@ -104,9 +105,11 @@ for tile in FORCE_tiles:
 
             for chunk_rows in range(0, cli_args.get("chunk")):
                 start_row: float = time()
-                output_torch[row + chunk_rows, col:col + cli_args.get("chunk")] = predict(lstm, s2_cube_prediction[chunk_rows])
+                output_torch[row + chunk_rows, col:col + cli_args.get("chunk")] = (
+                    predict(lstm, s2_cube_prediction[chunk_rows]))
                 logging.info(f"Processed row {chunk_rows}/{cli_args.get('chunk') - 1} of "
-                             f"row-wise chunk: {row}:{row + cli_args.get('chunk') - 1}, column-wise chunk: {col}:{col + cli_args.get('chunk') - 1} "
+                             f"row-wise chunk: {row}:{row + cli_args.get('chunk') - 1}, "
+                             f"column-wise chunk: {col}:{col + cli_args.get('chunk') - 1} "
                              f"({tile = }) in {time() - start_chunked:.2f} seconds")
 
             logging.info(f"Processed chunk in {time() - start_chunked} seconds")
@@ -124,4 +127,3 @@ for tile in FORCE_tiles:
     del s2_cube_prediction
     del output_torch
     del output_numpy
-
