@@ -37,11 +37,11 @@ if parse == True:
     print(f"UID = {UID}")
 
 else:
-    d_model = 128
-    nhead = 8
+    d_model = 204 # i want model dimension fit DOY_sequence length for now
+    nhead = 4 # AssertionError: embed_dim must be divisible by num_heads
     num_layers = 2
     dim_feedforward = 512
-    BATCH_SIZE = 305
+    BATCH_SIZE = 32
 
 
 # general hyperparameters
@@ -49,7 +49,7 @@ LR = 0.001 # learning rate, which in theory could be within the scope of paramet
 EPOCH = 420 # the maximum amount of epochs i want to train
 SEED = 420 # a random seed for reproduction, at some point i should try different random seeds to exclude (un)lucky draws
 patience = 25 # early stopping patience; how long to wait after last time validation loss improved.
-num_bands = 10 # number of different bands
+num_bands = 11 # number of different bands
 num_classes = 10 # the number of different classes that are supposed to be distinguished
 
 if local == True:
@@ -57,15 +57,12 @@ if local == True:
     PATH = '/home/j/data/'
     MODEL = 'Transformer'
     MODEL_NAME = MODEL + '_' + str(UID)
-    MODEL_PATH = '/home/j/data/outputs/models/' + MODEL_NAME   # TODO fix these joins
+    MODEL_PATH = '/home/j/data/outputs/models/' + MODEL_NAME
     EPOCH = 20
-    x_set = torch.load('/home/j/data/x_set.pt')
-    y_set = torch.load('/home/j/data/y_set.pt')
-
-
-# fixed settings:
-num_bands = 10 # number of columns in csv files
-num_classes = 10  # number of different labels / different tree species classes in data
+    x_set = torch.load('/home/j/data/x_set2.pt')
+    y_set = torch.load('/home/j/data/y_set2.pt')
+    with open('/home/j/data/DOY_sequence.npy', 'rb') as f:
+        DOY_sequence = np.load(f)
 
 def save_hyperparameters() -> None:
     """Save hyperparameters into a json file"""
@@ -100,35 +97,62 @@ def setup_seed(seed:int) -> None:
     torch.backends.cudnn.deterministic = True # https://darinabal.medium.com/deep-learning-reproducible-results-using-pytorch-42034da5ad7
     torch.backends.cudnn.benchmark = False # not sure if these lines are needed and non-deterministic algorithms would be used otherwise
 
-def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> tuple[Data.DataLoader, Data.DataLoader]:
+def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int, DOY_sequence:np.ndarray) -> tuple[Data.DataLoader, Data.DataLoader, Tensor]:
     """Build and split dataset, and generate dataloader for training and validation"""
     # automatically split dataset
     dataset = Data.TensorDataset(x_set, y_set) #  'wrapping' tensors: Each sample will be retrieved by indexing tensors along the first dimension.
+    # x_set: [204, 305, 11] number of files, sequence length, number of bands
     size = len(dataset)
     train_size, val_size = round(0.8 * size), round(0.2 * size)
     generator = torch.Generator() # this is for random sampling
-    train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator)
+    # turn DOY sequence from np array into tensor
+    doy_sequence_tensor = torch.from_numpy(DOY_sequence) # load the DOY sequence
+    train_dataset, val_dataset = Data.random_split(dataset, [train_size, val_size], generator) # split the data in train and validation
     # Create PyTorch data loaders from the datasets
-    train_loader = Data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+    train_loader = Data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1) # TODO: What is the DataLoader object? does it re-initialize every time it is called in train()?
     val_loader = Data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
     # num_workers is for parallelizing this function, however i need to set it to 1 on the HPC
     # shuffle is True so data will be shuffled in every epoch, this probably is activated to decrease overfitting
     # TODO: make sure, this does not mess up the proportions of classes seen by the training.
-    return train_loader, val_loader
+    return train_loader, val_loader, doy_sequence_tensor
 
-def train(model:nn.Module, epoch:int) -> tuple[float, float]:
+def train(model:nn.Module, epoch:int, doy_sequence:Tensor) -> tuple[float, float]:
+    doy_sequence = doy_sequence
     model.train()
     good_pred = 0
     total = 0
     losses = []
+    for (inputs, labels) in train_loader:
+        labels = labels.to(device)
+        inputs = inputs.to(device) # pass the data into the gpu [3, 305, 11] 3?, sequence max length, num_bands
+        inputs = torch.permute(inputs, (1, 0, 2))  # i need to switch the dimensions compared to LSTM to make the tensor match with the labels # from transformer.forward src: [seq_len, batch_sz, num_bands]
+        outputs = model(inputs, DOY_sequence_tensor)  # applying the model
+        # at this point inputs is 305,3,11. 305 [timesteps, ?, num_bands] TODO: Where does this come from, what is 2nd position and do i need all 11 bands? exclude DOY ?
+        loss = criterion(outputs, labels)  # calculating loss by comparing to the y_set
+        # recording training accuracy
+        good_pred += val.true_pred_num(labels, outputs)
+        total += labels.size(0)
+        # record training loss
+        losses.append(loss.item())
+        # backward and optimize
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    acc = good_pred / total
+    train_loss = np.average(losses)
+    print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '.format(epoch + 1, EPOCH, train_loss, acc * 100), end="")
+    return train_loss, acc
+
+
     for i, (inputs, labels) in enumerate(train_loader):
-        inputs = inputs[:,:, 0:10] # this excludes DOY and date from the x_data
+        # inputs = inputs[:,:, 0:10] # this was used for excluding date etc, as i do all the data preparation in create_dataset.py, i think it is no longer needed
         # pass the data into the gpu
         inputs = inputs.to(device)
-        inputs = torch.permute(inputs, (1,0,2)) # for some reason i need to switcheroo the dimensions compared to LSTM to make the tensor match with the labels
+        # from transformer.forward src: [seq_len, batch_sz, num_bands]
+        inputs = torch.permute(inputs, (1,0,2)) # i need to switcheroo the dimensions compared to LSTM to make the tensor match with the labels
         labels = labels.to(device)
         # forward pass
-        outputs = model(inputs) # applying the model
+        outputs = model(inputs, DOY_sequence_tensor) # applying the model
         loss = criterion(outputs, labels) # calculating loss by comparing to the y_set
         # recording training accuracy
         good_pred += val.true_pred_num(labels, outputs)
@@ -153,8 +177,9 @@ def validate(model:nn.Module) -> tuple[float, float]:
         total = 0
         losses = []
         for (inputs, labels) in val_loader:
-            inputs = inputs[:, :, 0:10] # this excludes DOY and date
+            # inputs = inputs[:, :, 0:10] # this
             inputs:Tensor = inputs.to(device)# put the data in gpu
+            inputs = torch.permute(inputs, (1, 0, 2))
             labels:Tensor = labels.to(device)
             outputs:Tensor = model(inputs) # prediction
             loss = criterion(outputs, labels)
@@ -178,13 +203,13 @@ def timestamp():
     print("Current Time =", current_time)
 
 if __name__ == "__main__":
-    setup_seed(SEED)  # set random seed to ensure reproducability
+    setup_seed(SEED)  # set random seed to ensure reproducibility
     # device = torch.device('cuda:'+args.GPU_NUM if torch.cuda.is_available() else 'cpu') # Device configuration
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # Device configuration
     timestamp()
-    train_loader, val_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
+    train_loader, val_loader, DOY_sequence_tensor = build_dataloader(x_set, y_set, BATCH_SIZE, DOY_sequence)
     # model
-    model = TransformerClassifier(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
+    model = TransformerClassifier(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward, DOY_sequence_tensor).to(device)
     save_hyperparameters()
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), LR)
@@ -201,7 +226,7 @@ if __name__ == "__main__":
     early_stopping = EarlyStopping(patience=patience, verbose=True)
     for epoch in range(EPOCH):
         # print(epoch)
-        train_loss, train_acc = train(model, epoch)
+        train_loss, train_acc = train(model, epoch, DOY_sequence_tensor)
         val_loss, val_acc = validate(model)
         if val_acc > min(val_epoch_acc):
             torch.save(model.state_dict(), MODEL_PATH)

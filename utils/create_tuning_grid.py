@@ -19,16 +19,16 @@ if LSTM == 1:
 
 else: # Transformer
     # Define the possible values for each argument
-    d_model = [64, 128, 256]
-    nhead = [128, 256, 512]
-    num_layers = [3, 4, 5]
-    dim_feedforward = [128, 256, 512]
+    d_model = [128, 256, 512]
+    nhead = [4, 8, 16]
+    num_layers = [2, 4, 8]
+    dim_feedforward = [256, 512, 1028]
     batch_size = [128, 256, 512]
 
 
     # Generate the grid of argument combinations
     grid = list(itertools.product(d_model, nhead, num_layers, dim_feedforward, batch_size))
     # Save the grid to a file
-    with open('/home/jonathak90/tuning_grid_transformer_pixelbased.json', 'w') as f:
+    with open('/home/j/data/tuning_grid_transformer_pixelbased_unformated.json', 'w') as f:
         json.dump(grid, f)
 

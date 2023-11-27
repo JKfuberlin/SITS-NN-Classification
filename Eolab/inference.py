@@ -11,19 +11,21 @@ import multiprocessing # for parallelization
 from shapely.geometry import mapping # for clipping
 from rasterio.transform import from_origin # for assigning an origin to the created map
 
-# tiles = np.loadtxt('/my_volume/BW_tiles.txt', dtype=str) # this file contains the XY tile names of my AOI in the same format as FORCE
+tiles = np.loadtxt('/home/eouser/tiles.txt', dtype=str) # this file contains the XY tile names of my AOI in the same format as FORCE
 
 device = torch.device('cpu') # assigning cpu for inference
-model_pkl = torch.load('/my_volume/bi_lstm_demo.pkl',  map_location=torch.device('cpu')) # loading the trained model
+model_pkl = torch.load('/home/eouser/Transformer_33.pkl',  map_location=torch.device('cpu')) # loading the trained model
 
 def predict(input):
-    outputs = model_pkl(input)
+    model_pkl.eval() # set model to eval mode to avoid dropout layer
+    with torch.no_grad(): # do not track gradients during forward pass to speed up
+        outputs = model_pkl(input)
     _, predicted = torch.max(outputs.data, 1)
     return predicted
 
 raster_paths = []
 
-tile ="X0067_Y0058" # Landshut
+#tiles ="X0067_Y0058" # Landshut
 
 for tile in tiles:
     s2dir = glob.glob(('/force/FORCE/C1/L2/ard/'+tile+'/'), recursive=True) # Initialize path to Sentinel-2 time series
@@ -74,7 +76,7 @@ raster_paths = [raster_path for raster_path, year in zip(raster_paths, years) if
 datacube = [rxr.open_rasterio(raster_path) for raster_path in raster_paths]  # i user rxr because the clip function from rasterio sucks
 # the datacube is too large for the RAM of my contingent so i need to subset using the 5x5km tiles
 # grid_tiles = glob.glob(os.path.join('/my_volume/FORCE_tiles_subset_BW/', '*' + tile + '*.gpkg'))
-grid_tiles = '/my_volume/31.gpkg'
+grid_tiles = '/home/eouser/landshut_minibatch.gpkg'
 # checking workflow:
 
 minitile = grid_tiles
@@ -97,10 +99,17 @@ for raster in datacube:  # clip the rasters using the geometry
 datacube_np = np.array(clipped_datacube, ndmin = 4) # this is now a clipped datacube for the first minitile, fixing it to be 4 dimensions
 datacube_np.shape
 datacube_torch16 = torch.tensor(datacube_np) # turn the numpy array into a pytorch tensor, the result is in int16..
-datacube_torch32 = datacube_torch16.to(torch.float32) # ...so we need to transfert it to float32 so that the model can use it as input
+datacube_torch32 = datacube_torch16.to(torch.float32) # ...so we need to transfer it to float32 so that the model can use it as input
 datacube_torch32.shape # torch.Size([320, 10, 500, 500])
 
-data_for_prediction = datacube_torch32.permute(2, 3, 0, 1)  # rearrange data
+data_for_prediction1 = datacube_torch32.permute(2, 3, 0, 1)  # [500, 500, 320, 10] This worked for LSTM
+# RuntimeError: The expanded size of the tensor (500) must match the existing size (329) at non-singleton dimension 0.  Target sizes: [500].  Tensor sizes:[329]
+data_for_prediction2 = datacube_torch32.permute(2, 3, 1, 0)  # [500, 500, 10, 320] RuntimeError: mat1 and mat2 shapes cannot be multiplied
+data_for_prediction3 = datacube_torch32.permute(0, 2, 3, 1) # [320, 500, 500, 10] runs, but now i iterate over the length of the TS and it stops at 329
+data_for_prediction4 = datacube_torch32 # [320, 10, 500, 500]
+
+# IndexError: index 329 is out of bounds for dimension 0 with size 329
+
 data_for_prediction.shape #torch.Size([500, 500, 320, 10])
 
 # data = data_for_prediction.reshape(320, 10, -1) # torch.Size([320, 10, 250000])
@@ -113,13 +122,53 @@ data_for_prediction.shape #torch.Size([500, 500, 320, 10])
 # y = data_for_prediction_3d.shape[3]
 x = 500
 y = 500
-
 result = torch.zeros([x, y])  # create empty tensor where results will be written
 
-for row in range(x):
-    predictions = predict(data_for_prediction[row])
+for row, col in range(x):
+    predictions = predict(data_for_prediction1[row, col])
     print(row)
-    result[row] = predictions
+    result[row, col] = predictions
+
+result = torch.zeros([x, y], dtype=torch.float32)  # specify the data type
+
+def predict(input):
+    model_pkl.eval() # set model to eval mode to avoid dropout layer
+    with torch.no_grad(): # do not track gradients during forward pass to speed up
+        outputs = model_pkl(input)
+    _, predicted = torch.max(outputs.data, 1) # to get class
+    return predicted
+
+
+# Assuming predict function takes a single image as input
+def predict_single_image(input):
+    model_pkl.eval()  # Set the model to evaluation mode
+    with torch.no_grad():
+        outputs = model_pkl(input)
+    _, predicted = torch.max(outputs, 1)
+    binary_mask = torch.zeros([500, 500])
+    binary_mask.view(-1)[predicted] = 1
+    print("test")
+    binary_mask = binary_mask.view(500, 500)
+    return binary_mask
+    pass
+
+# # unroll function
+# model_pkl.eval()  # Set the model to evaluation mode
+# with torch.no_grad():
+#     outputs = model_pkl(data_for_prediction4[1])
+# _, predicted = torch.max(outputs, 1)
+# binary_mask = torch.zeros([500, 500])
+# binary_mask.view(-1)[predicted] = 1
+
+
+for timestep in range(329):  # Iterate over the timesteps
+    # Assuming data_for_prediction is a tensor of size [329, 10, 500, 500]
+    predictions = predict_single_image(data_for_prediction4[timestep])
+    print(timestep)
+    # Make sure predictions size matches [x, y]
+    assert predictions.size() == torch.Size([x, y]), "Size mismatch in predictions"
+    result[timestep] = predictions
+
 
 result = torch.tensor(result)  # Convert the list to an array
 map = result.numpy()
@@ -140,5 +189,5 @@ metadata = {
     'transform': from_origin(origin[0], origin[1], 10, 10)  # Set the origin and pixel size (assumes each pixel is 1 unit)
 }
 
-with rasterio.open(os.path.join('/my_volume/', 'landshut_example2.tif'), 'w', **metadata) as dst:
+with rasterio.open(os.path.join('/home/eouser/', 'landshut_Transformer33.tif'), 'w', **metadata) as dst:
     dst.write_band(1, map.astype(rasterio.float32))

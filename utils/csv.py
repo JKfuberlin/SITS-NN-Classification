@@ -3,8 +3,7 @@ import numpy as np
 from typing import Tuple, List
 import os
 
-
-def load(file_path:str, index_col:str, date:bool=False) -> pd.DataFrame:
+def custom_load(file_path:str, index_col:str, date:bool=False) -> pd.DataFrame:
     """Load csv file to pandas.Dataframe"""
     if date:
         df = pd.read_csv(file_path, sep=',', header=0, parse_dates = ['date'], index_col=False)
@@ -13,7 +12,6 @@ def load(file_path:str, index_col:str, date:bool=False) -> pd.DataFrame:
     else:
         df = pd.read_csv(file_path, sep=',', header=0, index_col=False)
     return df
-
 
 def export(df:pd.DataFrame, file_path:str, index:bool=True) -> None:
     """Export pandas.Dataframe to csv file"""
@@ -26,8 +24,8 @@ def delete(file_path:str) -> None:
     print(f'delete file {file_path}')
 
 def balance_labels(label_path:str):
-    labels = load(label_path, 'ID')
-    # find out least common class in labels
+    labels = custom_load(label_path, 'ID')
+    # find out the least common class in labels
     # Count the occurrences of each label
     label_counts = labels["encoded"].value_counts()
     # Get the label with the least occurrences
@@ -96,7 +94,7 @@ def to_numpy(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
     max_len = 0
     for index, row in labels.iterrows():
         df_path = os.path.join(data_dir, f'{index}.csv') # TODO fix messed up file names
-        df = load(df_path, 'date', True)
+        df = custom_load(df_path, 'date', True)
         max_len = max(max_len, df.shape[0])
     print(f'max sequence length: {max_len}')
     # Step 2: transfer to numpy array
@@ -104,7 +102,7 @@ def to_numpy(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
     y_list = []
     for index, row in labels.iterrows():
         df_path = os.path.join(data_dir, f'{index}.csv') # TODO: fix csv names
-        df = load(df_path, 'date', True)
+        df = custom_load(df_path, 'date', True)
         df = df.drop('date', axis=1) # i decided to drop the date again because i cannot convert it to float32 and i still have DOY for identification
         x = np.array(df).astype(np.float32)
         # use 0 padding make sequence length equal
@@ -127,7 +125,7 @@ def to_numpy_subset(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
     # TODO: something is messed up with the column names, i think naming one of them "ID" is a bad idea as it somehow gets switched around with the index
     for id in labels['ID']:
         df_path = os.path.join(data_dir, f'{id}.csv')
-        df = load(df_path, 'date', True)
+        df = custom_load(df_path, 'date', True)
         max_len = max(max_len, df.shape[0])
     print(f'max sequence length: {max_len}')
     # Step 2: transfer to numpy array
@@ -138,7 +136,7 @@ def to_numpy_subset(data_dir:str, labels) -> Tuple[np.ndarray, np.ndarray]:
         info = tuple[1] # access the first element of the tuple, which is a <class 'pandas.core.series.Series'>
         ID = info[0] # the true value for the ID after NA removal and some messing up is here, this value identifies the csv
         df_path = os.path.join(data_dir, f'{ID}.csv')
-        df = load(df_path, 'date', True)
+        df = custom_load(df_path, 'date', True)
         df = df.drop('date', axis=1)  # i decided to drop the date again because i cannot convert it to float32 and i still have DOY for identification
         x = np.array(df).astype(np.float32) # create a new numpy array from the loaded csv file containing spectral values with the dataype float32
         # use 0 padding make sequence length equal
