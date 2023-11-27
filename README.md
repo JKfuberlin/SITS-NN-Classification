@@ -35,3 +35,23 @@ poetry add --source=pytorch_cpu torch torchvision torchaudio
 ## Usage
 
 ### Standalone Scripts
+
+Tree species can be predicted with the standalone `inference.py` script. Currently, inference is possible with LSTM 
+classifier only. Please note, that a [FORCE](https://force-eo.readthedocs.io/en/latest/) datacube is expected as input.
+
+```bash
+python apps/inference.py --help
+
+# usage: inference.py [-h] -w WEIGHTS --input-tiles INPUT --input-dir BASE --output-dir OUT --date-cutoff DATE [--chunk-size CHUNK] [--log] [--log-file LOG-FILE]
+# 
+# optional arguments:
+#   -h, --help            show this help message and exit
+#   -w WEIGHTS, --weights WEIGHTS
+#   --input-tiles INPUT
+#   --input-dir BASE
+#   --output-dir OUT
+#   --date-cutoff DATE
+#   --chunk-size CHUNK
+#   --log
+#   --log-file LOG-FILE
+```
