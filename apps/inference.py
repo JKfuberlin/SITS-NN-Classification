@@ -14,15 +14,27 @@ import logging
 from time import time
 from sits_classifier import models
 
-parser: argparse.ArgumentParser = argparse.ArgumentParser()
-parser.add_argument("-w", "--weights", dest="weights", required=True, type=Path)
-parser.add_argument("--input-tiles", dest="input", required=True, type=Path)
-parser.add_argument("--input-dir", dest="base", required=True, type=Path)
-parser.add_argument("--output-dir", dest="out", required=True, type=Path)
-parser.add_argument("--date-cutoff", dest="date", required=True, type=int)
-parser.add_argument("--chunk-size", dest="chunk", required=False, type=int, default=1000)
-parser.add_argument("--log", dest="log", required=False, action="store_true")
-parser.add_argument("--log-file", dest="log-file", required=False, type=str)
+parser: argparse.ArgumentParser = argparse.ArgumentParser(
+    description="Run inference with already trained LSTM classifier on a remote-sensing time series represented as "
+                "FORCE ARD datacube.")
+parser.add_argument("-w", "--weights", dest="weights", required=True, type=Path,
+                    help="Path to pre-trained classifier to be loaded via `torch.load`. Can be either a relative or "
+                         "absolute file path.")
+parser.add_argument("--input-tiles", dest="input", required=True, type=Path,
+                    help="List of FORCE tiles which should be used for inference. Each line should contain one FORCE "
+                         "tile specifier (Xdddd_Ydddd).")
+parser.add_argument("--input-dir", dest="base", required=True, type=Path,
+                    help="Path to FORCE datacube.")
+parser.add_argument("--output-dir", dest="out", required=True, type=Path,
+                    help="Path to directory into which predictions should be saved.")
+parser.add_argument("--date-cutoff", dest="date", required=True, type=int,
+                    help="Cutoff date for time series which should be included in datacube for inference.")
+parser.add_argument("--chunk-size", dest="chunk", required=False, type=int, default=1000,
+                    help="Chunk size which further subsets FORCE tiles for RAM-friendly prediction.")
+parser.add_argument("--log", dest="log", required=False, action="store_true",
+                    help="Emit logs?")
+parser.add_argument("--log-file", dest="log-file", required=False, type=str,
+                    help="If logging is enabled, write to this file. If omitted, logs are written to stdout.")
 
 cli_args: Dict[str, Union[Path, int, bool, str]] = vars(parser.parse_args())
 
