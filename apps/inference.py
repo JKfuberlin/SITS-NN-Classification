@@ -1,13 +1,12 @@
-# TODO use argparse and maybe even outsource it to its own class
 # TODO convert to stand-alone script which can be run via the command line
 # TODO needless data type conversion when saving output image?
 # TODO package models into a library so that importing is easier
 # TODO fix GPU inference: https://stackoverflow.com/questions/71278607/pytorch-expected-all-tensors-on-same-device
 # TODO try inference with 500 pixel by 500 pixel size
+import argparse
 from pathlib import Path
 from re import search
 from typing import List, Any, Union, Dict
-
 import numpy as np
 import rasterio
 import rioxarray as rxr
@@ -15,25 +14,30 @@ import torch
 import xarray
 import logging
 from time import time
-
 from sits_classifier import models
 
-logging.basicConfig(level=logging.INFO, filename="/home/eouser/git-repos/futureforest/Eolab/inference-log.txt")
+parser: argparse.ArgumentParser = argparse.ArgumentParser()
+parser.add_argument("-w", "--weights", dest="weights", required=True, type=Path)
+parser.add_argument("--input-tiles", dest="input", required=True, type=Path)
+parser.add_argument("--input-dir", dest="base", required=True, type=Path)
+parser.add_argument("-o", "--output-dir", dest="out", required=True, type=Path)
+parser.add_argument("-c", "--chunk-size", dest="chunk", required=False, type=int, default=1000)
+parser.add_argument("--date-cutoff", dest="date", required=True, type=int)
+parser.add_argument("--log", dest="log", required=False, action="store_true")
+parser.add_argument("--log-file", dest="log-file", required=False, type=str)
 
-INPUT_TILE_PATH: str = "/home/eouser/git-repos/futureforest/Eolab/tiles.txt"
-INPUT_WEIGHTS_PATH: str = "/home/eouser/git-repos/futureforest/outputs/models/LSTM_26.pkl"
-S2_BASE_DIR: Path = Path("/force/FORCE/C1/L2/ard/")
-OUTPUT_BASE_DIR: Path = Path("/home/eouser/git-repos/futureforest/outputs/data")
-MASK_BASE_DIR: Path = Path("/home/eouser/git-repos/futureforest/FORCE_minibatches")
-LANDSHUT: str = "X0067_Y0058"
-MINITILE: int = 31
-CHUNK_SIZE = 1000  # GeoPackages are 500 pixel by 500 pixel
-NEWEST_CUTOFF: int = 20230302
+cli_args: Dict[str, Union[Path, int, bool, str]] = vars(parser.parse_args())
 
-with open(INPUT_TILE_PATH, "rt") as f:
+if cli_args.get("log"):
+    if cli_args.get("log_file"):
+        logging.basicConfig(level=logging.INFO, filename=cli_args.get("log-file"))
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+with open(cli_args.get("input"), "rt") as f:
     FORCE_tiles: List[str] = [tile.replace("\n", "") for tile in f.readlines()]
 
-lstm: torch.nn.LSTM = torch.load(INPUT_WEIGHTS_PATH, map_location=torch.device('cpu'))
+lstm: torch.nn.LSTM = torch.load(cli_args.get("weights"), map_location=torch.device('cpu'))
 
 template_metadata: Dict[str, Any] = {
     'driver': 'GTiff',
@@ -68,10 +72,10 @@ for tile in FORCE_tiles:
     #minitile = gpd.read_file(MASK_BASE_DIR / Path(LANDSHUT) / (str(MINITILE) + ".gpkg"))
 
     logging.info(f"Processing FORCE tile {tile}")
-    s2_tile_dir: Path = S2_BASE_DIR / tile
+    s2_tile_dir: Path = cli_args.get("base") / tile
     tile_paths: List[str] = [str(p) for p in s2_tile_dir.glob("*SEN*BOA.tif")]
     cube_inputs: List[str] = [
-        tile_path for tile_path in tile_paths if int(search(r"\d{8}", tile_path).group(0)) <= NEWEST_CUTOFF
+        tile_path for tile_path in tile_paths if int(search(r"\d{8}", tile_path).group(0)) <= cli_args.get("date")
     ]
 
     # TODO there may exist an easier solution than opening an image from my tile stack
@@ -86,14 +90,14 @@ for tile in FORCE_tiles:
     tile_cols: int = metadata["width"]  # s2_cube_prediction.shape[3]
     output_torch: torch.tensor = torch.zeros([tile_rows, tile_cols])
 
-    for row in range(0, tile_rows, CHUNK_SIZE):
-        for col in range(0, tile_cols, CHUNK_SIZE):
+    for row in range(0, tile_rows, cli_args.get("chunk")):
+        for col in range(0, tile_cols, cli_args.get("chunk")):
             start_chunked: float = time()
             logging.info(f"Creating chunked data cube")
             s2_cube: Union[xarray.Dataset, xarray.DataArray, list[xarray.Dataset]] = []
             for cube_input in cube_inputs:
                 layer: Union[xarray.Dataset, xarray.DataArray] = rxr.open_rasterio(cube_input)
-                clipped_layer = layer.isel(x=slice(row, row + CHUNK_SIZE), y=slice(col, col + CHUNK_SIZE))
+                clipped_layer = layer.isel(x=slice(row, row + cli_args.get("chunk")), y=slice(col, col + cli_args.get("chunk")))
                 s2_cube.append(clipped_layer)
 
             logging.info(f"Converting chunked data cube to numpy array")
@@ -106,11 +110,11 @@ for tile in FORCE_tiles:
             # TODO why not use smaller image tiles as input? is the lstm fixed to a certain input length?
             #  alternatively: below, the prediction is done row-wise per tile. The clipping should not matter in that
             #  case!
-            for chunk_rows in range(0, CHUNK_SIZE):
+            for chunk_rows in range(0, cli_args.get("chunk")):
                 start_row: float = time()
-                output_torch[row + chunk_rows, col:col + CHUNK_SIZE] = predict(lstm, s2_cube_prediction[chunk_rows])
-                logging.info(f"Processed row {chunk_rows}/{CHUNK_SIZE - 1} of "
-                             f"row-wise chunk: {row}:{row + CHUNK_SIZE - 1}, column-wise chunk: {col}:{col + CHUNK_SIZE - 1} "
+                output_torch[row + chunk_rows, col:col + cli_args.get("chunk")] = predict(lstm, s2_cube_prediction[chunk_rows])
+                logging.info(f"Processed row {chunk_rows}/{cli_args.get("chunk") - 1} of "
+                             f"row-wise chunk: {row}:{row + cli_args.get("chunk") - 1}, column-wise chunk: {col}:{col + cli_args.get("chunk") - 1} "
                              f"({tile = }) in {time() - start_chunked:.2f} seconds")
 
             logging.info(f"Processed chunk in {time() - start_chunked} seconds")
@@ -118,7 +122,7 @@ for tile in FORCE_tiles:
     output_numpy: np.array = output_torch.numpy()
 
     # TODO save as int not float
-    with rasterio.open(OUTPUT_BASE_DIR / (tile + ".tif"), 'w', **metadata) as dst:
+    with rasterio.open(cli_args.get("out") / (tile + ".tif"), 'w', **metadata) as dst:
         dst.write_band(1, output_numpy.astype(rasterio.float32))
 
     logging.info(f"Processed tile {tile} in {time() - start} seconds")
