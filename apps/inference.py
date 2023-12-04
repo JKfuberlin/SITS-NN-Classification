@@ -110,13 +110,8 @@ for tile in FORCE_tiles:
     tile_cols: int = metadata["width"]  # s2_cube_prediction.shape[3]
     output_torch: torch.tensor = torch.zeros([tile_rows, tile_cols])
 
-    # TODO instead of cli_args.get("chunk"), check what the user wants.
-    #  If the block sizes should be used, substitute the step size.
-    #  If only one of the two CL args are given, I need a different loops depending on what's selected.
-    #    If one argument is missing, use tile_* as the step size and argument in layer.isel(). The code
-    #    does not need to be further split/abstracted into functions if I'm not mistaken.
     row_step: int = cli_args.get("row-block") or row_block
-    col_step: int = cli_args.get("col_block") or col_block
+    col_step: int = cli_args.get("col-block") or col_block
 
     if tile_rows % row_step != 0 or tile_cols % col_step != 0:
         raise AssertionError("Rows and columns must be divisible by their respective step sizes without remainder.")
