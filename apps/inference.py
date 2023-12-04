@@ -62,17 +62,6 @@ with open(cli_args.get("input"), "rt") as f:
 
 lstm: torch.nn.LSTM = torch.load(cli_args.get("weights"), map_location=torch.device('cpu'))
 
-template_metadata: Dict[str, Any] = {
-    'driver': 'GTiff',
-    'width': None,
-    'height': None,
-    'count': 1,
-    'dtype': rasterio.float32,
-    'crs': 'EPSG:3035',
-    'transform': None
-}
-
-
 def predict(model, data: torch.tensor) -> Any:
     """
     Apply previously trained LSTM to new data
