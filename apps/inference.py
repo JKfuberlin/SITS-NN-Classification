@@ -127,16 +127,17 @@ for tile in FORCE_tiles:
             logging.info(f"Creating chunked data cube")
             s2_cube: Union[xarray.Dataset, xarray.DataArray, list[xarray.Dataset]] = []
             for cube_input in cube_inputs:
-                # TODO close ds and rename layer to ds
-                layer: Union[xarray.Dataset, xarray.DataArray] = rxr.open_rasterio(cube_input)
-                clipped_layer = layer.isel(y=slice(row, row + row_step),
+                ds: Union[xarray.Dataset, xarray.DataArray] = rxr.open_rasterio(cube_input)
+                clipped_ds = ds.isel(y=slice(row, row + row_step),
                                            x=slice(col, col + col_step))
-                s2_cube.append(clipped_layer)
+                s2_cube.append(clipped_ds)
+                ds.close()
 
             logging.info(f"Converting chunked data cube to numpy array")
-            s2_cube_np: np.ndarray = np.array(s2_cube, ndmin=4)
+            s2_cube_np: np.ndarray = np.array(s2_cube, ndmin=4, dtype=np.float32)
+            del s2_cube
             logging.info(f"Converting chunked numpy array to torch tensor")
-            s2_cube_torch: torch.tensor = torch.tensor(s2_cube_np, dtype=torch.float32)
+            s2_cube_torch: torch.tensor = torch.as_tensor(s2_cube_np)
             logging.info(f"Permuting torch tensor")
             s2_cube_prediction: torch.tensor = s2_cube_torch.permute(2, 3, 0, 1)
 
@@ -152,6 +153,10 @@ for tile in FORCE_tiles:
 
             logging.info(f"Processed chunk in {time() - start_chunked} seconds")
 
+            del s2_cube_np
+            del s2_cube_torch
+            del s2_cube_prediction
+
     output_numpy: np.array = output_torch.numpy()
 
     with rasterio.open(cli_args.get("out") / (tile + ".tif"), 'w', **metadata) as dst:
@@ -160,8 +165,5 @@ for tile in FORCE_tiles:
     logging.info(f"Processed tile {tile} in {time() - start} seconds")
 
     del metadata
-    del s2_cube
-    del s2_cube_torch
-    del s2_cube_prediction
     del output_torch
     del output_numpy
