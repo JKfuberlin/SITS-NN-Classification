@@ -50,19 +50,42 @@ poetry shell
 
 python apps/inference.py --help
 
-# usage: inference.py [-h] -w WEIGHTS --input-tiles INPUT --input-dir BASE --output-dir OUT --date-cutoff DATE [--chunk-size CHUNK] [--log] [--log-file LOG-FILE]
+# usage: inference.py [-h] -w WEIGHTS --input-tiles INPUT --input-dir BASE [--input-glob IGLOB] --output-dir OUT
+#                     --date-cutoff DATE [--mask-dir MASKS] [--mask-glob MGLOB] [--row-size ROW-BLOCK]
+#                     [--col-size COL-BLOCK] [--log] [--log-file LOG-FILE]
 # 
 # Run inference with already trained LSTM classifier on a remote-sensing time series represented as FORCE ARD datacube.
 # 
 # optional arguments:
 #   -h, --help            show this help message and exit
 #   -w WEIGHTS, --weights WEIGHTS
-#                         Path to pre-trained classifier to be loaded via `torch.load`. Can be either a relative or absolute file path.
-#   --input-tiles INPUT   List of FORCE tiles which should be used for inference. Each line should contain one FORCE tile specifier (Xdddd_Ydddd).
+#                         Path to pre-trained classifier to be loaded via `torch.load`. Can be either a relative or
+#                         absolute file path.
+#   --input-tiles INPUT   List of FORCE tiles which should be used for inference. Each line should contain one FORCE
+#                         tile specifier (Xdddd_Ydddd).
 #   --input-dir BASE      Path to FORCE datacube.
+#   --input-glob IGLOB    Optional glob pattern to restricted files used from `input-dir`.
 #   --output-dir OUT      Path to directory into which predictions should be saved.
 #   --date-cutoff DATE    Cutoff date for time series which should be included in datacube for inference.
-#   --chunk-size CHUNK    Chunk size which further subsets FORCE tiles for RAM-friendly prediction.
+#   --mask-dir MASKS      Path to directory containing folders in FORCE tile structure storing binary masks with a value
+#                         of 1 representing pixels to predict. Others can be nodata or 0. Masking is done on a row-by-
+#                         row basis. I.e., the entire unmasked datacube is constructed from the files found in `input-
+#                         dir`. Only when handing a row of pixels to the DL-model for inference are data removed. Thus,
+#                         this does not reduce the memory footprint, but can speed up inference significantly under
+#                         certain conditions.
+#   --mask-glob MGLOB     Optional glob pattern to restricted file used from `mask-dir`.
+#   --row-size ROW-BLOCK  Row-wise size to read in at once. If not specified, query dataset for block size and assume
+#                         constant block sizes across all raster bands in case of multilayer files. Contrary to what
+#                         GDAL allows, if the entire raster extent is not evenly divisible by the block size, an error
+#                         will be raised and the process aborted. If only `row-size` is given, read the specified amount
+#                         of rows and however many columns are given by the datasets block size. If both `row-size` and
+#                         `col-size` are given, read tiles of specified size.
+#   --col-size COL-BLOCK  Column-wise size to read in at once. If not specified, query dataset for block size and assume
+#                         constant block sizes across all raster bands in case of multilayer files. Contrary to what
+#                         GDAL allows, if the entire raster extent is not evenly divisible by the block size, an error
+#                         will be raised and the process aborted. If only `col-size` is given, read the specified amount
+#                         of columns and however many rows are given by the datasets block size. If both `col-size` and
+#                         `row-size` are given, read tiles of specified size.
 #   --log                 Emit logs?
 #   --log-file LOG-FILE   If logging is enabled, write to this file. If omitted, logs are written to stdout.
 ```
