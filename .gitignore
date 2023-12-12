@@ -4,3 +4,9 @@ __pycache__
 test.py
 outputs/data/
 dist/
+Eolab/masks/
+
+Eolab/tiles.txt
+Eolab/test.txt
+*.gpkg
+*.pkl
