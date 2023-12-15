@@ -90,7 +90,7 @@ class TransformerClassifier(nn.Module):
                     nn.BatchNorm1d(256),
                     nn.Dropout(0.3),
                     nn.Linear(256, num_classes),
-                    nn.Softmax(dim=1) # TODO check if dim = 10 makes more sense for 10 classes -> input as sparse matrix probably necessary
+                    nn.Softmax(dim=1)
                 )
 
     def forward(self, input_sequence: Tensor) -> Tensor:
@@ -105,7 +105,7 @@ class TransformerClassifier(nn.Module):
             torch.Tensor: Output tensor after passing through the model.
         """
         input_sequence_bands = input_sequence[:,:,0:10] # this is the input sequence without DOY
-        obs_embed = self.src_embd(input_sequence_bands)  # [batch_size, seq_len, d_model] # TODO: this should be 3,305,10 because DOY is not the object of embedding at thin point -> slice beforehand
+        obs_embed = self.src_embd(input_sequence_bands)  # [batch_size, seq_len, d_model] #
         self.PEinstance = PositionalEncoding(d_model=self.d_model, max_len=max_len)
         # this is where the input of form [batch_size, seq_len, n_bands] is passed through the linear transformation of the function src_embd()
         # to create the embeddings

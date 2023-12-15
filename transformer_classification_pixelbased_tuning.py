@@ -10,12 +10,18 @@ from sits_classifier.utils.pytorchtools import EarlyStopping
 import sys
 import torch # Pytorch - DL framework
 from torch import nn, optim, Tensor
+from torch.profiler import profile, record_function, ProfilerActivity
 import torch.utils.data as Data
+from torch.utils.tensorboard import SummaryWriter
 import os # for creating dirs if needed
 sys.path.append('../') # navigating one level up to access all modules
 
 local = True
 parse = False
+logfile = '/tmp/logfile_transformer_pxl' # for logging model Accuracy
+writer = SummaryWriter(log_dir='/home/j/data/prof/') # initialize tensorboard
+
+'''call http://localhost:6006/ for tensorboard to review profiling'''
 
 if parse == True:
     parser = argparse.ArgumentParser(description='trains the Transformer with given parameters')
@@ -42,7 +48,6 @@ else:
     num_layers = 2
     dim_feedforward = 512
     BATCH_SIZE = 32
-
 # general hyperparameters
 LR = 0.001 # learning rate, which in theory could be within the scope of parameter tuning
 EPOCH = 420 # the maximum amount of epochs i want to train
@@ -60,7 +65,6 @@ if local == True:
     EPOCH = 20
     x_set = torch.load('/home/j/data/x_set.pt')
     y_set = torch.load('/home/j/data/y_set.pt')
-
 def save_hyperparameters() -> None:
     """Save hyperparameters into a json file"""
     params = {
@@ -143,7 +147,8 @@ def train(model:nn.Module, epoch:int) -> tuple[float, float]:
         optimizer.step()
     acc = good_pred / total
     train_loss = np.average(losses)
-    print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '.format(epoch + 1, EPOCH, train_loss, acc * 100), end="")
+    # print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '.format(epoch + 1, EPOCH, train_loss, acc * 100), end="")
+    prof.step() # Need to call this at the end of each step to notify profiler of steps' boundary.
     return train_loss, acc
 def validate(model:nn.Module) -> tuple[float, float]:
     model.eval()
@@ -163,8 +168,8 @@ def validate(model:nn.Module) -> tuple[float, float]:
             losses.append(loss.item()) # record validation loss
         acc = good_pred / total  # average train loss and accuracy for one epoch
         val_loss = np.average(losses)
-    print('| Validation Loss: {:.4f} | Validation Accuracy: {:.2f}%'
-        .format(val_loss, 100 * acc))
+    # print('| Validation Loss: {:.4f} | Validation Accuracy: {:.2f}%'.format(val_loss, 100 * acc))
+    writer.add_scalar("Accuracy", acc, epoch)
     return val_loss, acc
 
 # test() function is not used at the moment because i use the maps created by each model architecture and set of hyperparameters
@@ -216,15 +221,34 @@ if __name__ == "__main__":
     print("start training")
     timestamp()
     # initialize the early_stopping object
-    early_stopping = EarlyStopping(patience=patience, verbose=True)
-    # epoch = 1
+    early_stopping = EarlyStopping(patience=patience, verbose=False)
+    logdir = '/home/j/data/prof'
+    loss_idx_value = 0 # for the writer, logging scalars, whatever that means WTF
+    # with profile(activities=[ProfilerActivity.CPU],
+    #              schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+    #              on_trace_ready=torch.profiler.tensorboard_trace_handler(logdir + "/profiler"),
+    #              record_shapes=True,
+    #              profile_memory=True,
+    #              with_stack=True
+    #              ) as prof:
     for epoch in range(EPOCH):
+
+        prof = torch.profiler.profile(
+            schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(logdir + "/profiler"),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True)
+
+        prof.start()
+
         # print(epoch)
         train_loss, train_acc = train(model, epoch)
         val_loss, val_acc = validate(model)
         if val_acc > min(val_epoch_acc):
             torch.save(model.state_dict(), MODEL_PATH)
             best_acc = val_acc
+            best_epoch = epoch
         # record loss and accuracy
         train_epoch_loss.append(train_loss)
         train_epoch_acc.append(train_acc)
@@ -233,8 +257,14 @@ if __name__ == "__main__":
         early_stopping(val_loss, model)
         if early_stopping.early_stop:
             print("Early stopping in epoch " + str(epoch))
-            print("validation loss: " + str(best_acc))
+            print("Best model in epoch :" + str(best_epoch))
+            print("Model ID: " + UID + "; validation loss: " + str(best_acc))
             break
+        writer.add_scalar("Loss/Epochs", val_loss, epoch)
+        prof.stop()
+    writer.close() # WTF no writer.flush()?
+    # prof.export_chrome_trace("/tmp/prof/profiler_trace.json") Error: AssertionError in export_chrome_trace assert self.profiler
+    # prof.stop() # stopping profiler
     # visualize loss and accuracy during training and validation
     model.load_state_dict(torch.load(MODEL_PATH))
     plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss',method='LSTM', model=MODEL_NAME, uid=UID)
@@ -242,7 +272,11 @@ if __name__ == "__main__":
     timestamp()
     # test(model)
     print('plot results successfully')
+    writer.close()
     torch.save(model, f'/home/j/data/outputs/models/{MODEL_NAME}.pkl')
+    f = open(logfile, 'w')
+    f.write("Model ID: " + str(UID) + "; validation accuracy: " + str(best_acc) + '\n')
+    f.close()
 
 
 # Annex 1 tensor.view() vs tensor.reshape()
