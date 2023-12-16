@@ -14,7 +14,11 @@ from torch.profiler import profile, record_function, ProfilerActivity
 import torch.utils.data as Data
 from torch.utils.tensorboard import SummaryWriter
 import os # for creating dirs if needed
-sys.path.append('../') # navigating one level up to access all modules
+sys.path.append('../../') # navigating one level up to access all modules
+
+# explainable AI:
+from utils.captum import visualize_timeseries_attr_cs, TimeseriesVisualizationMethod_cs, VisualizeSign_cs
+
 
 local = True
 parse = False
@@ -263,8 +267,7 @@ if __name__ == "__main__":
         writer.add_scalar("Loss/Epochs", val_loss, epoch)
         prof.stop()
     writer.close() # WTF no writer.flush()?
-    # prof.export_chrome_trace("/tmp/prof/profiler_trace.json") Error: AssertionError in export_chrome_trace assert self.profiler
-    # prof.stop() # stopping profiler
+
     # visualize loss and accuracy during training and validation
     model.load_state_dict(torch.load(MODEL_PATH))
     plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss',method='LSTM', model=MODEL_NAME, uid=UID)
@@ -272,7 +275,17 @@ if __name__ == "__main__":
     timestamp()
     # test(model)
     print('plot results successfully')
-    writer.close()
+
+    # explainable AI, show timeseries attributions
+    # visualize_timeseries_attr_cs(
+    #     attr,
+    #     data,
+    #     x_values=x_values,
+    #     method="individual_channels",
+    #     sign="absolute_value",
+    #     channel_labels=["Channel 1", "Channel 2", "Channel 3"],  # Replace with your actual channel labels
+    #     # Other parameters as needed
+    # )
     torch.save(model, f'/home/j/data/outputs/models/{MODEL_NAME}.pkl')
     f = open(logfile, 'w')
     f.write("Model ID: " + str(UID) + "; validation accuracy: " + str(best_acc) + '\n')
