@@ -21,7 +21,7 @@ sys.path.append('../../') # navigating one level up to access all modules
 local = True
 parse = False
 logfile = '/tmp/logfile_transformer_pxl' # for logging model Accuracy
-writer = SummaryWriter(log_dir='/home/j/data/prof/') # initialize tensorboard
+writer = SummaryWriter(log_dir='/home/jonathan/data/prof/') # initialize tensorboard
 
 '''call http://localhost:6006/ for tensorboard to review profiling'''
 

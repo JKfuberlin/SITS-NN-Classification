@@ -11,7 +11,7 @@ packages = [
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.13"
+python = ">=3.6,<3.13" # 3.6 requirement for tensorflow / tensorboard
 rasterio = "^1.3.9"
 shapely = "^2.0.2"
 numpy = "^1.26.1"
