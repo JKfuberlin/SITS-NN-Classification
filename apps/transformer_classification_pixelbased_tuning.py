@@ -10,14 +10,12 @@ from sits_classifier.utils.pytorchtools import EarlyStopping
 import sys
 import torch # Pytorch - DL framework
 from torch import nn, optim, Tensor
-from torch.profiler import profile, record_function, ProfilerActivity
 import torch.utils.data as Data
 from torch.utils.tensorboard import SummaryWriter
 import os # for creating dirs if needed
 sys.path.append('../../') # navigating one level up to access all modules
 
 # explainable AI:
-from utils.captum import visualize_timeseries_attr_cs, TimeseriesVisualizationMethod_cs, VisualizeSign_cs
 
 
 local = True
