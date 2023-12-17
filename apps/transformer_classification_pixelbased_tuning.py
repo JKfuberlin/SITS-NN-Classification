@@ -224,7 +224,7 @@ if __name__ == "__main__":
     timestamp()
     # initialize the early_stopping object
     early_stopping = EarlyStopping(patience=patience, verbose=False)
-    logdir = '/home/j/data/prof'
+    logdir = '/home/jonathan/data/prof'
     loss_idx_value = 0 # for the writer, logging scalars, whatever that means WTF
     # with profile(activities=[ProfilerActivity.CPU],
     #              schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     #     channel_labels=["Channel 1", "Channel 2", "Channel 3"],  # Replace with your actual channel labels
     #     # Other parameters as needed
     # )
-    torch.save(model, f'/home/j/data/outputs/models/{MODEL_NAME}.pkl')
+    torch.save(model, f'/home/jonathan/data/outputs/models/{MODEL_NAME}.pkl')
     f = open(logfile, 'w')
     f.write("Model ID: " + str(UID) + "; validation accuracy: " + str(best_acc) + '\n')
     f.close()
