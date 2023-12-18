@@ -3,6 +3,8 @@ Convolutional neural network for tree species classification
 
 ## Installation
 
+> :warning: Read the section `tensorflow` before installing from source!
+
 ### Python Wheels
 
 **Currently not available!**
@@ -33,6 +35,17 @@ To revert back to the CUDA 12.1 wheels, run:
 poetry remove torch torchvision torchaudio
 poetry add torch torchvision torchaudio
 ```
+
+#### Tensorflow
+
+Apparently, since tensorflow 2.11, the metadata content in the supplied wheels differ from platform to platform insted
+of using version markers. Because of that, installation using poetry fails since it downloads the first wheel it
+finds. There are two possible soultions, while I only managed to get things working using the first:
+
+1. Specify a specific verison of tensorflow, e.g. `poetry add tensorflow==2.15.0` will install the newest version at
+the time of writing
+2. Apply patches to poetry before installing the dependencies as specified [here}(https://github.com/mazyod/poetry-legacy-index).
+
 ## Usage
 
 ### Standalone Scripts
