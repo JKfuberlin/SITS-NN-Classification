@@ -3,7 +3,7 @@ name = "sits-classification"
 version = "0.1.0"
 description = ""
 authors = ["Jonathan Költzow <jonathan.koeltzow@fu-berlin.de>", "Florian Katerndahl <florian.katerndahl@fu-berlin.de>"]
-maintainers = ["Florian Katerndahl <florian.katerndahl@fu-berlin.de>"]
+maintainers = ["Florian Katerndahl <florian.katerndahl@fu-berlin.de>", "Jonathan Költzow <jonathan.koeltzow@fu-berlin.de>"]
 repository = "https://github.com/Florian-Katerndahl/sits-classification"
 packages = [
     { include = "sits_classifier" }
@@ -11,7 +11,7 @@ packages = [
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.13"
+python = ">=3.9,<3.11"
 rasterio = "^1.3.9"
 shapely = "^2.0.2"
 numpy = "^1.26.1"
@@ -24,6 +24,7 @@ torchaudio = "^2.1.1"
 matplotlib = "^3.8.2"
 scikit-learn = "^1.3.2"
 torchmetrics = "^1.2.0"
+tensorflow = "2.15.0"
 
 
 [[tool.poetry.source]]
