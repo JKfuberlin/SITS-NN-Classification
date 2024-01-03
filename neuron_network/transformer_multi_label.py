@@ -14,19 +14,19 @@ import utils.plot as plot
 
 
 # file path
-PATH='/home/admin/dongshen/data'
-DATA_DIR = os.path.join(PATH, 'gee', 'bw_8main_daily_padding')
-LABEL_CSV = 'label_7multi20.csv'
+PATH='/home/j/data/'
+DATA_DIR = os.path.join(PATH, 'polygons_object_test')
+LABEL_CSV = '/home/j/Nextcloud/csv/multilabels_test.csv'
 METHOD = 'multi_label'
 MODEL = 'transformer'
-UID = '7ml20'
+UID = 'localtest'
 MODEL_NAME = MODEL + '_' + UID
 LABEL_PATH = os.path.join(PATH, 'ref', 'all',LABEL_CSV)
 MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
 BATCH_SIZE = 512
-LR = 0.001
+LR = 0.00001
 EPOCH = 50
 SEED = 8
 
@@ -43,8 +43,6 @@ def setup_seed(seed:int) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
-
-
 def save_hyperparameters() -> None:
     """Save hyperparameters into a json file"""
     params = {
@@ -68,8 +66,6 @@ def save_hyperparameters() -> None:
         data = json.dumps(params, indent=4)
         f.write(data)
     print('saved hyperparameters')
-
-
 def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tensor]:
     """Transfer numpy.ndarray to torch.tensor, and necessary pre-processing like embedding or reshape"""
     x_set = torch.from_numpy(x_data)
@@ -81,8 +77,6 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tenso
     x_set:Tensor = batch_norm(x_set)
     x_set = x_set.view(sz, seq, num_bands).detach()
     return x_set, y_set
-
-
 def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
     dataset = Data.TensorDataset(x_set, y_set)
@@ -97,8 +91,6 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.D
     val_loader = Data.DataLoader(val_dataset,batch_size=batch_size, shuffle=True,num_workers=4)
     test_loader = Data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     return train_loader, val_loader, test_loader
-
-
 def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     model.train()
     accs = []
@@ -128,8 +120,6 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     print('Epoch[{}/{}] | Train Loss: {:.4f} | Train Accuracy: {:.2f}% '
         .format(epoch+1, EPOCH, train_loss, acc * 100), end="")
     return train_loss, acc
-
-
 def validate(model:nn.Module) -> Tuple[float, float]:
     model.eval()
     accs = []
@@ -156,8 +146,6 @@ def validate(model:nn.Module) -> Tuple[float, float]:
     print('| Validation Loss: {:.4f} | Validation Accuracy: {:.2f}%'
         .format(val_loss, 100 * acc))
     return val_loss, acc
-
-
 def test(model:nn.Module) -> None:
     """Test best model"""
     model.eval()
@@ -196,6 +184,13 @@ if __name__ == "__main__":
     # Device configuration
     device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
     # dataset
+
+    # labels = csv.load(LABEL_PATH, None)
+    # x_list = []
+    # y_list = []
+    # for index, row in labels.iterrows():
+    #     df_path = os.path.join(DATA_DIR, f'{row[0]}.csv')
+
     x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
