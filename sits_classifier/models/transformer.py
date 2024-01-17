@@ -46,6 +46,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe) # WTF i don't know what and why
 
     def forward(self, doy):
+        doy = doy.to(self.pe.device)
         return self.pe[doy, :]
     # Chris' solution
 
@@ -104,6 +105,10 @@ class TransformerClassifier(nn.Module):
         Returns:
             torch.Tensor: Output tensor after passing through the model.
         """
+
+        if len(input_sequence.shape) == 2:
+            # Add a batch dimension if it's not present (assuming batch size of 1)
+            input_sequence = input_sequence.unsqueeze(1)
         input_sequence_bands = input_sequence[:,:,0:10] # this is the input sequence without DOY
         obs_embed = self.src_embd(input_sequence_bands)  # [batch_size, seq_len, d_model] #
         self.PEinstance = PositionalEncoding(d_model=self.d_model, max_len=max_len)
@@ -115,12 +120,12 @@ class TransformerClassifier(nn.Module):
         # X dimensions are [batch_size, seq_length, d_model*2], iterates over number of samples in each batch
         for i in range(input_sequence.size(0)):
             x[i, :, self.d_model:] = self.PEinstance(input_sequence[i, :, 10].long()).squeeze()
-        #each batch's embedding is sliced and the second half replaced with a positional embedding of the DOY (11th column of the input_sequence) at the corresponding observation i
+        # each batch's embedding is sliced and the second half replaced with a positional embedding of the DOY (11th column of the input_sequence) at the corresponding observation i
+
         output = self.transformer_encoder(x)
         # output: [seq_len, batch_size, d_model]
         output = output.mean(dim=1) #GPT WTF this is global max pooling, i am not sure what it means and how it works but it seemingly helps to attribute a single class to the entire time series instead of separate labels for each time step of the SITS
         output = self.fc(output) #GPT should be [batch_size, num_classes]
-        # output = self.fc(output[-0, :, :]) # WTF is this subsetting??? i think i need either this or the global max pooling
         # final shape: [batch_size, num_classes]
         return output
 
