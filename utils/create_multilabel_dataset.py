@@ -5,8 +5,8 @@ import utils.csv as csv
 import os
 
 # # settings
-PATH = '/home/j/Nextcloud/csv/'
-DATA_DIR = os.path.join(PATH, 'multilabel_microdose/')
+PATH='/home/j/data/'
+DATA_DIR = os.path.join(PATH, 'polygons_for_object_test_reshaped')
 LABEL_CSV = 'multilabels.csv'
 LABEL_PATH = os.path.join(PATH, LABEL_CSV)
 # LABEL_PATH = '/home/jonathan/data/multilabels.csv'
@@ -34,12 +34,20 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> tuple[Tensor, Tenso
     # The `.detach()` method is used here to create a new tensor that is detached from the computation graph.
     # This is done to prevent gradients from flowing backward through this tensor, as it is only used for inference, not for training.
     return x_set, y_set
-
 # the thing about standardization is whether to normalize each band separately or all the values at once. in this case, nn.BatchNorm1d(num_bands), each band is normalized individually afaik
 # in case all values are merged there is the problem of inclusion of date/DOY values at this point of development. These columns should be removed from the dataset beforehand.
+def numpy_to_tensor2(x_data):
+    # Assuming x_data is a NumPy array with dtype numpy.ndarray
+    # Convert each numpy array in the NumPy array to a PyTorch tensor
+    tensor_list = [torch.tensor(subarray) for subarray in x_data]
+    # Stack the tensors along a new dimension to create a 3D tensor
+    x_set = torch.stack(tensor_list)
+    return x_set
+'''here i need to implement sequence padding and fix the numpy to tensor function'''
 
 if __name__ == "__main__":
-    labels = csv.shuffle_labels(LABEL_PATH, DATA_DIR) # remove y_data with no correspondence in DATA_DIR and optionally balance the data based on minority class in dataset
+    balance = False
+    labels = csv.balance_labels_subset(LABEL_PATH, DATA_DIR, balance) # TODO: Revise if this step needs shuffling of labels
     x_data, y_data = csv.to_numpy(DATA_DIR, labels) # turn csv file into numpy dataset
     x_data.shape
     x_data = x_data[:,:, 1:11]
@@ -47,6 +55,9 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data) # turn dataset into tensor format
     torch.save(x_set, '/home/j/data/x_set.pt')
     torch.save(y_set, '/home/j/data/y_set.pt')
+
+
+x_set = numpy_to_tensor2(x_data)
 
 label_path = LABEL_PATH
 data_dir = DATA_DIR

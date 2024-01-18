@@ -15,7 +15,7 @@ import utils.plot as plot
 
 # file path
 PATH='/home/j/data/'
-DATA_DIR = os.path.join(PATH, 'polygons_object_test')
+DATA_DIR = os.path.join(PATH, 'polygons_for_object_test_reshaped')
 LABEL_CSV = '/home/j/Nextcloud/csv/multilabels_test.csv'
 METHOD = 'multi_label'
 MODEL = 'transformer'
@@ -26,8 +26,8 @@ MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
 
 # general hyperparameters
 BATCH_SIZE = 512
-LR = 0.00001
-EPOCH = 50
+LR = 0.01
+EPOCH = 20
 SEED = 8
 
 # hyperparameters for Transformer model
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     # for index, row in labels.iterrows():
     #     df_path = os.path.join(DATA_DIR, f'{row[0]}.csv')
 
-    x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH)
+    x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH, None)
     x_set, y_set = numpy_to_tensor(x_data, y_data)
     train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
