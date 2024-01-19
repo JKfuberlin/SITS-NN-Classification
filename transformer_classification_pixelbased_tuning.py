@@ -314,7 +314,7 @@ if __name__ == "__main__":
     #     # Other parameters as needed
     # )
     torch.save(model, f'/home/j/home/jonathan/data/outputs/models/{MODEL_NAME}.pkl')
-    f = open(logfile, 'w')
+    f = open(logfile, 'a')
     f.write("Model ID: " + str(UID) + "; validation accuracy: " + str(best_acc) + '\n')
     f.close()
 
