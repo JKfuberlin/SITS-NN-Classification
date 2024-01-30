@@ -67,14 +67,11 @@ class TransformerMultiLabel(nn.Module):
         encoder_norm = LayerNorm(d_model*2)
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
         output_size = d_model
-        self.fc = nn.Sequential(
-                    nn.Linear(output_size, 256),
+        self.global_max_pooling = nn.AdaptiveMaxPool1d(1) # global max pooling
+        self.fc = nn.Sequential( # this takes the output of the transformer encoder after max pooling and passes it through linear layers to converge on num_classes
+                    nn.Linear(output_size*2, 256),
                     nn.ReLU(),
-                    nn.BatchNorm1d(256),
-                    nn.Dropout(0.3),
                     nn.Linear(256, num_classes),
-                    nn.Sigmoid(),
-                    nn.Softmax(dim=1)
                 )
         # regression
 
@@ -96,7 +93,7 @@ class TransformerMultiLabel(nn.Module):
             x[i, :, self.d_model:] = self.PEinstance(input_sequence[i, :, num_bands].long()).squeeze()
         # each batch's embedding is sliced and the second half replaced with a positional embedding of the DOY (11th column of the input_sequence) at the corresponding observation i
         output = self.transformer_encoder(x) # output: [seq_len, batch_size, d_model]
-        output = output.mean(dim=1)  # GPT WTF this is global max pooling, i am not sure what it means and how it works but it seemingly helps to attribute a single class to the entire time series instead of separate labels for each time step of the SITS
+        output = self.global_max_pooling(output.permute(0,2,1)).squeeze(2)
         output = self.fc(output)  # GPT should be [batch_size, num_classes]
         # final shape: [batch_size, num_classes]
         return output

@@ -153,9 +153,7 @@ def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
         # exchange dimension 0 and 1 of inputs depending on batch_first or not
         inputs:Tensor = inputs.transpose(0, 1)
         labels:Tensor = refs[:,1:]
-        print(inputs.shape)
         inputs = inputs.permute(1, 0, 2) # I want the dimension order to be: batch, sequence, bands
-        print(inputs.shape)
         # put the data in gpu
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -191,15 +189,13 @@ def validate(model:nn.Module) -> Tuple[float, float]:
             # exchange dimension 0 and 1 of inputs depending on batch_first or not
             inputs:Tensor = inputs.transpose(0, 1)
             labels:Tensor = refs[:,1:]
-            print(inputs.shape)
             inputs = inputs.permute(1, 0, 2)  # I want the dimension order to be: batch, sequence, bands
-            print(inputs.shape)
             # put the data in gpu
             inputs = inputs.to(device)
             labels = labels.to(device)
             # prediction
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            outputs = model(inputs, num_bands, num_classes)
+            loss = F.binary_cross_entropy_with_logits(outputs, labels.float())
             # recording validation accuracy
             outputs = sigmoid(outputs)
             accs.append(val.multi_label_acc(labels, outputs))
@@ -284,18 +280,34 @@ if __name__ == "__main__":
     test(model)
     print('plot result successfully')
 
-
-'''debugging'''
+'''debug'''
 import torch
 from torch import nn, Tensor
 from torch.nn.modules.normalization import LayerNorm
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 import math
+
 dropout=0.1
 max_len = 5000 # defining maximum sequence length the model will be able to process here
 # model dimensions (hyperparameter), dropout is already included here to make the model less prone to overfitting due to a specific sequence, max_length is defined. DOY needs to be smaller than that
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+# I don't know if this makes sense here, as device should be assigned in the main script where model is trained / inference happens
+
 class PositionalEncoding(nn.Module):
+    """Inject some information about the relative or absolute position of the tokens in the sequence.
+        The positional encodings have the same dimension as the embeddings, so that the two can be summed.
+        Here, we use sine and cosine functions of different frequencies.
+    .. math:
+        \text{PosEncoder}(pos, 2i) = sin(pos/10000^(2i/d_model))
+        \text{PosEncoder}(pos, 2i+1) = cos(pos/10000^(2i/d_model))
+        \text{where pos is the word position and i is the embed idx)
+    Args:
+        d_model: the embed dim (required).
+        dropout: the dropout value (default=0.1).
+        max_len: the max. length of the incoming sequence (default=5000).
+    Examples:
+        pos_encoder = PositionalEncoding(d_model)
+    """
     def __init__(self, d_model:int, dropout=0.1, max_len=5000): # model dimensions (hyperparameter), dropout is already included here to make the model less prone to overfitting due to a specific sequence, max_length is defined. DOY needs to be smaller than that
         super(PositionalEncoding, self).__init__() # The super() builtin returns a proxy object (temporary object of the superclass) that allows us to access methods of the base class.
         # i do not understand what that means
@@ -318,29 +330,36 @@ class PositionalEncoding(nn.Module):
     #     # TODO: I could just try to pass the pe object to the TransformerClassifier class and concat there
     #
     #     return self.dropout(x)
-''''''
+# TODO: Change this class to match the PE concatenation from pixel_based branch
+class TransformerMultiLabel(nn.Module):
 d_model = d_model
         # encoder embedding
-src_embd = nn.Linear(num_bands, d_model)
+        src_embd = nn.Linear(num_bands, d_model)
         # transformer model #duplicating d_model for PE concatenation in second half
-encoder_layer = TransformerEncoderLayer(d_model*2, nhead, dim_feedforward)
-encoder_norm = LayerNorm(d_model*2)
-transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
-output_size = d_model
-fc = nn.Sequential(
-    # nn.Linear(d_model, 256),
-    # nn.ReLU(),
-    # nn.BatchNorm1d(256),
-    # nn.Dropout(0.3),
-    nn.Linear(256, num_classes)
-)
+        encoder_layer = TransformerEncoderLayer(d_model*2, nhead, dim_feedforward)
+        encoder_norm = LayerNorm(d_model*2)
+        transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
+        output_size = d_model
+        global_max_pooling = nn.AdaptiveMaxPool1d(1) # global max pooling
+        fc = nn.Sequential( # this takes the output of the transformer encoder after max pooling and passes it through linear layers to converge on num_classes
+                    nn.Linear(output_size*2, 256),
+                    nn.ReLU(),
+                    nn.Linear(256, num_classes),
+                )
+        # regression
 
 input_sequence = inputs
-    input_sequence_bands = input_sequence[:,:,0:num_bands]  # this is the input sequence without DOY
-    input_sequence_bands.shape
 
-    obs_embed = src_embd(input_sequence_bands)  # [batch_size, seq_len, d_model] #
-    PEinstance = PositionalEncoding(d_model=d_model, max_len=max_len)
+        if len(input_sequence.shape) == 2:
+            # Add a batch dimension if it's not present (assuming batch size of 1)
+            input_sequence = input_sequence.unsqueeze(1)
+        input_sequence_bands = input_sequence[:,:,0:num_bands]  # this is the input sequence without DOY, shape should be [batch_size, seq_len, num_bands]
+        # input_sequence_bands = input_sequence_bands.permute(0, 2, 1) # else use this to reshape
+        obs_embed = src_embd(input_sequence_bands)  # [batch_size, seq_len, d_model] #
+        PEinstance = PositionalEncoding(d_model=d_model, max_len=max_len)
+        # this is where the input of form [batch_size, seq_len, n_bands] is passed through the linear transformation of the function src_embd()
+        # to create the embeddings
+        # Repeat obs_embed to match the shape [batch_size, seq_len, embedding_dim*2]
         x = obs_embed.repeat(1, 1, 2)
         # Add positional encoding based on day-of-year
         # X dimensions are [batch_size, seq_length, d_model*2], iterates over number of samples in each batch
@@ -348,13 +367,9 @@ input_sequence = inputs
             x[i, :, d_model:] = PEinstance(input_sequence[i, :, num_bands].long()).squeeze()
         # each batch's embedding is sliced and the second half replaced with a positional embedding of the DOY (11th column of the input_sequence) at the corresponding observation i
         output = transformer_encoder(x) # output: [seq_len, batch_size, d_model]
-        output.shape
-        # output = output.mean(dim=1)  # GPT WTF this is global max pooling, i am not sure what it means and how it works but it seemingly helps to attribute a single class to the entire time series instead of separate labels for each time step of the SITS
+        output = global_max_pooling(output.permute(0,2,1)).squeeze(2)
+        output.shape #[batch, d_model] 8 256
         output = fc(output)  # GPT should be [batch_size, num_classes]
-fc2 = nn.Linear(256,12)
-out = fc2(x)
-output = fc2(output)
-# this kinda works, just applying a linear transformation leads to torch.Size([2, 429, 12]), now i could apply max pooling along dim 1
-output2 = output.mean(dim=1)
-output2.shape
-''''''
+        # final shape: [batch_size, num_classes]
+        return output
+    ''''''
