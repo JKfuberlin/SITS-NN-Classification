@@ -8,36 +8,85 @@ import sys
 import json
 sys.path.append('../')
 import utils.csv as csv
-from models.transformer import TransformerClassifier
+from models.transformer import TransformerMultiLabel
 import utils.validation as val
 import utils.plot as plot
 
 
-# file path
-PATH='/home/j/data/'
-DATA_DIR = os.path.join(PATH, 'polygons_for_object_test_reshaped')
-LABEL_CSV = '/home/j/Nextcloud/csv/multilabels_test.csv'
-METHOD = 'multi_label'
-MODEL = 'transformer'
-UID = 'localtest'
-MODEL_NAME = MODEL + '_' + UID
-LABEL_PATH = os.path.join(PATH, 'ref', 'all',LABEL_CSV)
-MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
+LOCAL = True
+PARSE = False
+LOG = False
+if LOG:
+    logfile = '/tmp/logfile_transformer_pxl' # for logging model Accuracy
+'''call http://localhost:6006/ for tensorboard to review profiling'''
+
+if PARSE:
+    parser = argparse.ArgumentParser(description='trains the Transformer with given parameters')
+    parser.add_argument('UID', type=int, help='the unique ID of this particular model')
+    # parser.add_argument('GPU_NUM', type=int, help='which GPU to use, necessary for parallelization')
+    parser.add_argument('d_model', type=int, help='d_model')
+    parser.add_argument('nhead', type=int, help='number of transformer heads')
+    parser.add_argument('num_layers', type=int, help='number of layers')
+    parser.add_argument('dim_feedforward', type=int, help='')
+    parser.add_argument('batch_size', type=int, help='batch size')
+    args = parser.parse_args()
+    # hyperparameters for LSTM and argparse
+    d_model = args.d_model  # larger
+    nhead = args.nhead  # larger
+    num_layers = args.num_layers  # larger
+    dim_feedforward = args.dim_feedforward
+    BATCH_SIZE = args.batch_size
+    UID = str(args.UID)
+    print(f"UID = {UID}")
+else:
+    d_model = 512 # i want model dimension fit DOY_sequence length for now
+    # d_model = 128
+    nhead = 4 # AssertionError: embed_dim must be divisible by num_heads
+    num_layers = 6
+    dim_feedforward = 256
+    BATCH_SIZE = 16
+
+if LOCAL:
+    # file path
+    PATH = '/home/j/data/'
+    DATA_DIR = os.path.join(PATH, 'polygons_for_object_test_reshaped')
+    LABEL_CSV = '/home/j/Nextcloud/csv/multilabels_test.csv'
+    METHOD = 'multi_label'
+    MODEL = 'transformer'
+    UID = 'localtest'
+    MODEL_NAME = MODEL + '_' + UID
+    LABEL_PATH = os.path.join(PATH, 'ref', 'all', LABEL_CSV)
+    MODEL_PATH = f'../../outputs/models/{METHOD}/{MODEL_NAME}.pth'
+
+    x_set = torch.load('/home/j/data/x_set_mltlbl.pt')
+    y_set = torch.load('/home/j/data/y_set_mltlbl.pt')
+    d_model = 128 # i want model dimension fit DOY_sequence length for now
+    # d_model = 128
+    nhead = 1 # AssertionError: embed_dim must be divisible by num_heads
+    num_layers = 1
+    dim_feedforward = 64
+    BATCH_SIZE = 8
+    EPOCH = 20
+    LR = 0.01  # learning rate, which in theory could be within the scope of parameter tuning
+    if LOG:
+        writer = SummaryWriter(log_dir='/home/j/data/prof/')  # initialize tensorboard
+else:
+    x_set = torch.load('/media/jonathan/d56fa91a-1ba4-4e5b-b249-8778a9b4e904/data/x_set_pixelbased.pt')
+    y_set = torch.load('/media/jonathan/d56fa91a-1ba4-4e5b-b249-8778a9b4e904/data/y_set_pixelbased.pt')
+    PATH = '/home/jonathan/data/'
+    MODEL = 'Transformer'
+    MODEL_NAME = MODEL + '_' + str(UID)
+    MODEL_PATH = '/home/jonathan/data/outputs/models/' + MODEL_NAME
+    EPOCH = 420  # the maximum amount of epochs i want to train
+    LR = 0.00001  # learning rate, which in theory could be within the scope of parameter tuning
+    if LOG:
+        writer = SummaryWriter(log_dir='/home/jonathan/data/prof/')  # initialize tensorboard
 
 # general hyperparameters
-BATCH_SIZE = 512
-LR = 0.01
-EPOCH = 20
-SEED = 8
-
-# hyperparameters for Transformer model
-num_bands = 10
-num_classes = 7
-d_model = 128
-nhead = 8
-num_layers = 2
-dim_feedforward = 512
-
+SEED = 420 # a random seed for reproduction, at some point i should try different random seeds to exclude (un)lucky draws
+patience = 25 # early stopping patience; how long to wait after last time validation loss improved.
+num_bands = 90 # number of different bands from Sentinel 2
+num_classes = 12 # the number of different classes that are supposed to be distinguished
 
 def setup_seed(seed:int) -> None:
     torch.manual_seed(seed)
@@ -62,6 +111,7 @@ def save_hyperparameters() -> None:
         }
     }
     out_path = f'../../outputs/models/{METHOD}/{MODEL_NAME}_params.json'
+    os.makedirs(os.path.dirname(out_path), exist_ok=True) # create dir if necessary
     with open(out_path, 'w') as f:
         data = json.dumps(params, indent=4)
         f.write(data)
@@ -79,7 +129,9 @@ def numpy_to_tensor(x_data:np.ndarray, y_data:np.ndarray) -> Tuple[Tensor, Tenso
     return x_set, y_set
 def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.DataLoader, Data.DataLoader, Data.DataLoader]:
     """Build and split dataset, and generate dataloader for training and validation"""
-    dataset = Data.TensorDataset(x_set, y_set)
+    x_set_detached = x_set.detach()
+    y_set_detached = y_set.detach()
+    dataset = Data.TensorDataset(x_set_detached, y_set_detached)
     # split dataset
     size = len(dataset)
     train_size, val_size = round(0.8 * size), round(0.1 * size)
@@ -91,20 +143,30 @@ def build_dataloader(x_set:Tensor, y_set:Tensor, batch_size:int) -> Tuple[Data.D
     val_loader = Data.DataLoader(val_dataset,batch_size=batch_size, shuffle=True,num_workers=4)
     test_loader = Data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     return train_loader, val_loader, test_loader
+import torch.nn.functional as F
 def train(model:nn.Module, epoch:int) -> Tuple[float, float]:
     model.train()
+    model.to(device)
     accs = []
     losses = []
     for i, (inputs, refs) in enumerate(train_loader):
         # exchange dimension 0 and 1 of inputs depending on batch_first or not
         inputs:Tensor = inputs.transpose(0, 1)
         labels:Tensor = refs[:,1:]
+        print(inputs.shape)
+        inputs = inputs.permute(1, 0, 2) # I want the dimension order to be: batch, sequence, bands
+        print(inputs.shape)
         # put the data in gpu
         inputs = inputs.to(device)
         labels = labels.to(device)
         # forward pass
-        outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        outputs = model(inputs, num_bands, num_classes)
+        outputs = outputs.view(-1, outputs.size(-1))
+        labels = labels.view(-1, labels.size(-1))
+        # Use binary_cross_entropy_with_logits for each class separately
+        loss = F.binary_cross_entropy_with_logits(outputs, labels.float())
+
+        # loss = criterion(outputs, labels)
         # recording training accuracy
         outputs = sigmoid(outputs)
         accs.append(val.multi_label_acc(labels, outputs))
@@ -129,6 +191,9 @@ def validate(model:nn.Module) -> Tuple[float, float]:
             # exchange dimension 0 and 1 of inputs depending on batch_first or not
             inputs:Tensor = inputs.transpose(0, 1)
             labels:Tensor = refs[:,1:]
+            print(inputs.shape)
+            inputs = inputs.permute(1, 0, 2)  # I want the dimension order to be: batch, sequence, bands
+            print(inputs.shape)
             # put the data in gpu
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -176,26 +241,13 @@ def test(model:nn.Module) -> None:
         plot.draw_pie_chart(ref, pred, MODEL_NAME)
         plot.draw_multi_confusion_matirx(ref, pred, MODEL_NAME)
 
-
-
 if __name__ == "__main__":
-    # set random seed
-    setup_seed(SEED)
-    # Device configuration
-    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
-    # dataset
-
-    # labels = csv.load(LABEL_PATH, None)
-    # x_list = []
-    # y_list = []
-    # for index, row in labels.iterrows():
-    #     df_path = os.path.join(DATA_DIR, f'{row[0]}.csv')
-
-    x_data, y_data = csv.to_numpy(DATA_DIR, LABEL_PATH, None)
-    x_set, y_set = numpy_to_tensor(x_data, y_data)
+    setup_seed(SEED)     # set random seed
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')     # Device configuration
+    x_set = torch.stack(x_set, dim=0)
     train_loader, val_loader, test_loader = build_dataloader(x_set, y_set, BATCH_SIZE)
     # model
-    model = TransformerClassifier(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
+    model = TransformerMultiLabel(num_bands, num_classes, d_model, nhead, num_layers, dim_feedforward).to(device)
     save_hyperparameters()
     # loss and optimizer
     # ******************change weight here******************
@@ -212,7 +264,6 @@ if __name__ == "__main__":
     train_epoch_acc = []
     val_epoch_acc = []
     max_val_acc = 0
-    # train and validate model
     print("start training")
     for epoch in range(EPOCH):
         train_loss, train_acc = train(model, epoch)
@@ -232,3 +283,78 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(MODEL_PATH))
     test(model)
     print('plot result successfully')
+
+
+'''debugging'''
+import torch
+from torch import nn, Tensor
+from torch.nn.modules.normalization import LayerNorm
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
+import math
+dropout=0.1
+max_len = 5000 # defining maximum sequence length the model will be able to process here
+# model dimensions (hyperparameter), dropout is already included here to make the model less prone to overfitting due to a specific sequence, max_length is defined. DOY needs to be smaller than that
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model:int, dropout=0.1, max_len=5000): # model dimensions (hyperparameter), dropout is already included here to make the model less prone to overfitting due to a specific sequence, max_length is defined. DOY needs to be smaller than that
+        super(PositionalEncoding, self).__init__() # The super() builtin returns a proxy object (temporary object of the superclass) that allows us to access methods of the base class.
+        # i do not understand what that means
+        self.dropout = nn.Dropout(p=dropout) # WTF i do not understand, what this does
+        pe = torch.zeros(max_len, d_model) # positional encoding object is initialized with zeros, according to max length and model dimension. 5000 because we need a position on the sin/cos line for every possible DOY
+        positionPE = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1) # used to create a 1-dimensional tensor representing the positions of tokens in a sequence.
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)) # a tensor representing the values used for scaling in the positional encoding calculation
+        # Apply the sinusoidal encoding to even indices and cosine encoding to odd indices
+        pe[:, 0::2] = torch.sin(positionPE * div_term)
+        pe[:, 1::2] = torch.cos(positionPE * div_term)
+        # pe = pe.unsqueeze(0).transpose(0, 1) # torch.Size([5000, 1, 204]) max_len, ?, d_model
+        self.register_buffer('pe', pe) #  Buffers are parameters that are not considered when computing gradients during backpropagation, we do not want to modify the PE
+
+    def forward(self, doy):
+        doy = doy.to(self.pe.device)
+        return self.pe[doy, :]
+
+    #     # x = x + self.pe[:x.size(0), :] # TODO: this is the problem, here something is added and it's not even DOY but something completely different, probably just the position in the sequence
+    #     # the bigger issue is that is done in the wrong class.
+    #     # TODO: I could just try to pass the pe object to the TransformerClassifier class and concat there
+    #
+    #     return self.dropout(x)
+''''''
+d_model = d_model
+        # encoder embedding
+src_embd = nn.Linear(num_bands, d_model)
+        # transformer model #duplicating d_model for PE concatenation in second half
+encoder_layer = TransformerEncoderLayer(d_model*2, nhead, dim_feedforward)
+encoder_norm = LayerNorm(d_model*2)
+transformer_encoder = TransformerEncoder(encoder_layer, num_layers, encoder_norm)
+output_size = d_model
+fc = nn.Sequential(
+    # nn.Linear(d_model, 256),
+    # nn.ReLU(),
+    # nn.BatchNorm1d(256),
+    # nn.Dropout(0.3),
+    nn.Linear(256, num_classes)
+)
+
+input_sequence = inputs
+    input_sequence_bands = input_sequence[:,:,0:num_bands]  # this is the input sequence without DOY
+    input_sequence_bands.shape
+
+    obs_embed = src_embd(input_sequence_bands)  # [batch_size, seq_len, d_model] #
+    PEinstance = PositionalEncoding(d_model=d_model, max_len=max_len)
+        x = obs_embed.repeat(1, 1, 2)
+        # Add positional encoding based on day-of-year
+        # X dimensions are [batch_size, seq_length, d_model*2], iterates over number of samples in each batch
+        for i in range(input_sequence.size(0)):
+            x[i, :, d_model:] = PEinstance(input_sequence[i, :, num_bands].long()).squeeze()
+        # each batch's embedding is sliced and the second half replaced with a positional embedding of the DOY (11th column of the input_sequence) at the corresponding observation i
+        output = transformer_encoder(x) # output: [seq_len, batch_size, d_model]
+        output.shape
+        # output = output.mean(dim=1)  # GPT WTF this is global max pooling, i am not sure what it means and how it works but it seemingly helps to attribute a single class to the entire time series instead of separate labels for each time step of the SITS
+        output = fc(output)  # GPT should be [batch_size, num_classes]
+fc2 = nn.Linear(256,12)
+out = fc2(x)
+output = fc2(output)
+# this kinda works, just applying a linear transformation leads to torch.Size([2, 429, 12]), now i could apply max pooling along dim 1
+output2 = output.mean(dim=1)
+output2.shape
+''''''
