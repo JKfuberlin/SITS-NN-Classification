@@ -5,6 +5,7 @@ from sklearn.metrics import confusion_matrix, r2_score
 import pandas as pd
 import geopandas as gpd
 from typing import List
+import os
 
 
 def draw_curve(y_train:List[float], y_val:List[float], name:str, method:str, model:str) -> None:
@@ -27,11 +28,11 @@ def draw_curve(y_train:List[float], y_val:List[float], name:str, method:str, mod
     plt.ylabel("Value")
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     # set title and legend
-    title = f'{model} {name}'
+    title = f'{model}{name}'
     plt.title(title)
     plt.legend()
     # save figure and clear
-    plt.savefig(f'../../outputs/pics/{method}/{title}.jpg')
+    plt.savefig(f'/home/j/data/outputs/pics/{method}/{title}.jpg')
     plt.clf()
 
 
@@ -58,7 +59,7 @@ def draw_confusion_matrix(ref:pd.DataFrame, pred:pd.DataFrame, classes:List[str]
     plt.xlabel('Prediction')
     plt.title(title)
     # save figure and clear
-    plt.savefig('../../outputs/pics/classification/'+ title +'.jpg')
+    plt.savefig('/home/j/data/outputs/pics/'+ title +'.jpg')
     plt.clf()
 
 
@@ -83,12 +84,16 @@ def draw_scatter_plot(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
             plt.xlabel('Prediction')
     # save figure and clear
     title = f'{model} scatter plot'
-    plt.savefig('../../outputs/pics/regression/'+ title +'.jpg')
+    plt.savefig('/home/j/data/outputs/pics/'+ title +'.jpg')
     plt.clf()
 
 
 def draw_pie_chart(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
     """Draw pie chart to show true predicted label number for multi-label classification"""
+    directory = '/home/j/data/outputs/pics/'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
     assert ref.shape == pred.shape, "reference and prediction must have the same shape"
     # compare reference and prediction
     res = (ref == pred).sum(axis=1)
@@ -104,11 +109,11 @@ def draw_pie_chart(ref:pd.DataFrame, pred:pd.DataFrame, model:str) -> None:
         gaps.append(0.05)
     plt.pie(x, labels=labels, explode=gaps, autopct='%.0f%%', textprops={"size":10})
     # set title and legend
-    plt.title(f'{model} predicted true labels')
+    plt.title(f' predicted true labels')
     plt.legend()
     # save figure and clear
-    title = f'{model} pie chart'
-    plt.savefig('../../outputs/pics/multi_label/'+ title +'.jpg')
+    title = f' pie chart'
+    plt.savefig('/home/j/data/outputs/pics/'+ title +'.jpg')
     plt.clf()
 
 
@@ -143,7 +148,7 @@ def draw_multi_confusion_matirx(ref:pd.DataFrame, pred:pd.DataFrame, model:str) 
     # save figure and clear
     title = f'{model} multi confusion matrix'
     plt.suptitle(title)
-    plt.savefig('../../outputs/pics/multi_label/'+ title +'.jpg')
+    plt.savefig('/home/j/data/outputs/pics/'+ title +'.jpg')
     plt.clf()
 
 
@@ -175,7 +180,7 @@ def draw_color_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     ax.set_title(title)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    plt.savefig(f'../../outputs/pics/map/classification/'+ title +'.jpg')
+    plt.savefig(f'/home/j/data/outputs/pics/'+ title +'.jpg')
     plt.clf()
 
 
@@ -223,7 +228,7 @@ def draw_symbol_map(gdf:gpd.GeoDataFrame, area:str, model:str) -> None:
     ax.set_title(title)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    plt.savefig(f'../../outputs/pics/map/multi_label/'+ title +'.jpg')
+    plt.savefig(f'/home/j/data/outputs/pics/'+ title +'.jpg')
     plt.clf()
 
 

@@ -217,23 +217,24 @@ def test(model:nn.Module) -> None:
             # exchange dimension 0 and 1 of inputs depending on batch_first or not
             inputs:Tensor = inputs.transpose(0, 1)
             labels:Tensor = refs[:,1:]
+            inputs = inputs.permute(1, 0, 2)
             # put the data in gpu
             inputs = inputs.to(device)
             labels = labels.to(device)
             # prediction
-            outputs:Tensor = model(inputs)
+            outputs:Tensor = model(inputs, num_bands, num_classes)
             outputs = sigmoid(outputs)
             predicted = torch.where(outputs >= 0.5, 1, 0)
             y_true += refs.tolist()
             refs[:, 1:] = predicted
             y_pred += refs.tolist()
         # ***************************change classes here***************************
-        cols = ['id','Spruce','Silver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore']
+        cols = ['id','Spruce','Silver Fir','Douglas Fir','Pine','Oak','Beech','Sycamore','Sycamore','Sycamore','Sycamore','Sycamore','Sycamore',]
         # *************************************************************************
         ref = csv.list_to_dataframe(y_true, cols, False)
         pred = csv.list_to_dataframe(y_pred, cols, False)
-        csv.export(ref, f'../../outputs/csv/{METHOD}/{MODEL_NAME}_ref.csv', True)
-        csv.export(pred, f'../../outputs/csv/{METHOD}/{MODEL_NAME}_pred.csv', True)
+        csv.export(ref, f'/home/j/data/outputs/1_ref.csv', True)
+        csv.export(pred, f'/home/j/data/outputs/csv/1_pred.csv', True)
         plot.draw_pie_chart(ref, pred, MODEL_NAME)
         plot.draw_multi_confusion_matirx(ref, pred, MODEL_NAME)
 
@@ -373,3 +374,34 @@ input_sequence = inputs
         # final shape: [batch_size, num_classes]
         return output
     ''''''
+
+plot.draw_curve(train_epoch_loss, val_epoch_loss, 'loss', METHOD, MODEL_NAME)
+plot.draw_curve(train_epoch_acc, val_epoch_acc, 'accuracy', METHOD, MODEL_NAME)
+from matplotlib import pyplot as plt
+from matplotlib.ticker import MaxNLocator
+def draw_curve(y_train:List[float], y_val:List[float], name:str, method:str, model:str) -> None:
+    """
+    Visualise the change of loss or accuracy over epochs
+    @params:
+    y_train: average values from training for each epoch
+    y_val: average values from validation for each epoch
+    name: Loss or Accuracy
+    model: LSTM or Tranformer
+    """
+    assert len(y_val) == len(y_train), "y_train and y_val must have the same length"
+    epoch = len(y_train)
+    x = [i for i in range(0, epoch)]
+    # plot 2 curves
+    plt.plot(x, y_train, color='b', label='train '+name)
+    plt.plot(x, y_val, color='y', label="validation "+name)
+    # set label
+    plt.xlabel("Epoch")
+    plt.ylabel("Value")
+    plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+    # set title and legend
+    title = f'{name}'
+    plt.title(title)
+    plt.legend()
+    # save figure and clear
+    plt.savefig(f'/home/j/data/outputs/pics/{title}.jpg')
+    plt.clf()
