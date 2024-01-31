@@ -6,7 +6,7 @@ import os
 
 # # settings
 PATH = '/home/j/data/'
-DATA_DIR = os.path.join(PATH, 'microdose/')
+DATA_DIR = os.path.join(PATH, 'microdose_pixelbased/')
 LABEL_CSV = 'labels_clean.csv'
 LABEL_PATH = os.path.join(PATH, LABEL_CSV)
 
@@ -45,11 +45,10 @@ def numpy_to_tensor(x_data: np.ndarray, y_data: np.ndarray) -> tuple[Tensor, Ten
 
 if __name__ == "__main__":
     balance = False
-    labels = csv.balance_labels_subset(LABEL_PATH, DATA_DIR,
-                                       balance)  # remove y_data with no correspondence in DATA_DIR and optionally
+    labels = csv.balance_labels_subset(LABEL_PATH, DATA_DIR, balance)  # remove y_data with no correspondence in DATA_DIR and optionally
     # balance the data based on minority class in dataset
     x_data, y_data = csv.to_numpy_subset(DATA_DIR, labels)  # turn csv file into numpy dataset
-    x_data = x_data[:, :, 1:11]
+    x_data = x_data[:, :, 1:12] # 1 - 12 subsets all bands + DOY
     x_set, y_set = numpy_to_tensor(x_data, y_data)  # turn dataset into tensor format
     torch.save(x_set, '/home/j/data/x_set.pt')
     torch.save(y_set, '/home/j/data/y_set.pt')

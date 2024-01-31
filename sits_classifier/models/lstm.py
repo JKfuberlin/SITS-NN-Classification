@@ -1,10 +1,10 @@
 import torch
 from torch import nn, Tensor
 
+'''Deprecated'''
+
 # Device configuration
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-
 class LSTMClassifier(nn.Module):
     def __init__(self, num_bands: int, input_size: int, hidden_size: int, num_layers: int, num_classes: int,
                  bidirectional: bool):
@@ -38,8 +38,6 @@ class LSTMClassifier(nn.Module):
         lstm_out, _ = self.lstm(x, (h0, c0))
         out = self.fc(lstm_out[:, -1, :])
         return out
-
-
 class LSTMCPU(nn.Module):
     def __init__(self, num_bands: int, input_size: int, hidden_size: int, num_layers: int, num_classes: int,
                  bidirectional: bool):
@@ -73,8 +71,6 @@ class LSTMCPU(nn.Module):
         lstm_out, _ = self.lstm(x, (h0, c0))
         out = self.fc(lstm_out[:, -1, :])
         return out
-
-
 class LSTMRegression(nn.Module):
     def __init__(self, num_bands: int, input_size: int, hidden_size: int, num_layers: int, num_classes: int,
                  bidirectional: bool):
@@ -106,8 +102,6 @@ class LSTMRegression(nn.Module):
         lstm_out, _ = self.lstm(x, (h0, c0))
         out = self.fc(lstm_out[:, -1, :])
         return out
-
-
 class LSTMMultiLabel(nn.Module):
     def __init__(self, num_bands: int, input_size: int, hidden_size: int, num_layers: int, num_classes: int,
                  bidirectional: bool):
