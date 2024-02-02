@@ -26,7 +26,7 @@ def to_numpy(data_dir:str, labels:pd.core.frame.DataFrame) -> tuple[np.ndarray, 
     x_list = []
     y_list = []
     for index, row in labels.iterrows():
-        df_path = os.path.join(data_dir, f'{row[0]}.csv')
+        df_path = os.path.join(data_dir, f'{row.iloc[0]}.csv')
         df = load(df_path, None, False)
         df = df.drop("date", axis = 1)
         x = np.array(df).astype(np.float32)
