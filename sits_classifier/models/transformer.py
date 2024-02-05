@@ -1,4 +1,9 @@
-iimport numpy as np
+import torch
+from torch import nn, Tensor
+from torch.nn.modules.normalization import LayerNorm
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
+import math
+import numpy as np
 import torch
 from torch import nn, Tensor
 import sits_classifier.utils.csv as csv
@@ -53,11 +58,7 @@ if __name__ == "__main__":
     x_set, y_set = numpy_to_tensor(x_data, y_data)  # turn dataset into tensor format
     torch.save(x_set, '/home/j/data/x_set.pt')
     torch.save(y_set, '/home/j/data/y_set.pt')
-mport torch
-from torch import nn, Tensor
-from torch.nn.modules.normalization import LayerNorm
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
-import math
+
 
 '''
 This script defines an instance of the Transformer Object for Classification
@@ -200,3 +201,4 @@ class TransformerMultiLabel(nn.Module):
         output = self.fc(output)  # GPT should be [batch_size, num_classes]
         # final shape: [batch_size, num_classes]
         return output
+

@@ -8,13 +8,14 @@ import numpy as np
 import rasterio
 import rioxarray as rxr
 import torch
+import torch.utils.data as Data # For dataloader class
 import xarray
 import logging
 from time import time
 from sits_classifier import models
 
 parser: argparse.ArgumentParser = argparse.ArgumentParser(
-    description="Run inference with already trained LSTM classifier on a remote-sensing time series represented as "
+    description="Run inference with already trained Transformer classifier on a remote-sensing time series represented as "
                 "FORCE ARD datacube.")
 parser.add_argument("-w", "--weights", dest="weights", required=True, type=Path,
                     help="Path to pre-trained classifier to be loaded via `torch.load`. Can be either a relative or "
@@ -70,12 +71,27 @@ if cli_args.get("log"):
 with open(cli_args.get("input"), "rt") as f:
     FORCE_tiles: List[str] = [tile.replace("\n", "") for tile in f.readlines()]
 
-lstm: torch.nn.LSTM = torch.load(cli_args.get("weights"), map_location=torch.device('cpu')).eval()
+FORCE_folder = '/force/FORCE/C1/L2/ard/X0067_Y0058/'
+import os
+FORCE_tiles: List[str] = []
+
+for filename in os.listdir(FORCE_folder):
+    file_path = os.path.join(FORCE_folder, filename)
+    if os.path.isfile(file_path):
+        with open(file_path, "rt") as f:
+            FORCE_tiles.extend([tile.replace("\n", "") for tile in f.readlines()])
+
+with open(FORCE_folder, "rt") as f:
+    FORCE_tiles: List[str] = [tile.replace("\n", "") for tile in f.readlines()]
+# device = 'cuda:0'
+device = 'cpu'
+trained_model: torch.nn.Transformer = torch.load(cli_args.get("weights"), map_location=torch.device(device)).eval()
+trained_model: torch.nn.Transformer = torch.load('/point_storage/data/Transformer_1.pkl', map_location=torch.device(device)).eval()
 
 
 def predict(model, data: torch.tensor) -> Any:
     """
-    Apply previously trained LSTM to new data
+    Apply previously trained Model to new data
     :param model: previously trained model
     :param torch.tensor data: new input data
     :return Any: Array of predictions
@@ -84,10 +100,13 @@ def predict(model, data: torch.tensor) -> Any:
     #      multi-threading is possible and I observe multi-CPU usage.
     #      Is multi-threading on by default? Documentation suggests no, but I'm not sure.
     #      torch.__config__.parallel_info() suggests, that multi-threading is active!
-    with torch.no_grad():
-        outputs = model(data)
-    _, predicted = torch.max(outputs.data, 1)
-    return predicted
+    model.eval() # set model to eval mode to avoid dropout layer
+    with torch.no_grad(): # do not track gradients during forward pass to speed up
+        for (inputs) in data:
+            batch = inputs.to(device)  # put the data in gpu
+            output_probabilities = model(batch)  # prediction
+            _, predicted_class = torch.max(output_probabilities,1)  # retrieving the class with the highest probability after softmax
+    return predicted_class
 
 
 for tile in FORCE_tiles:
@@ -141,7 +160,7 @@ for tile in FORCE_tiles:
             """
             The code below uses masked tensors to mask the actual data cube instead of dropping unwanted observations
             during prediction. However, at the time of writing, the method ADDMM is not implemented for masked tensors
-            in torch. Thus, inference fails when the model used, such as a lstm, calls this method somewhere.
+            in torch. Thus, inference fails when the model used, such as a trained_model, calls this method somewhere.
             It could be worth revisiting this approach in the future as it may be more generalizable and potentially
             reduce memory usage.
             
@@ -182,7 +201,7 @@ for tile in FORCE_tiles:
                 for chunk_rows in range(0, row_step):
                     merged_row.zero_()
                     squeezed_row: torch.Tensor = predict(
-                        lstm,
+                        trained_model,
                         # lines below are achieve the same subset
                         # torch.index_select(
                         #     s2_cube_torch[chunk_rows],
@@ -194,7 +213,9 @@ for tile in FORCE_tiles:
                     output_torch[row + chunk_rows, col:col + col_step] = merged_row
             else:
                 for chunk_rows in range(0, row_step):
-                    output_torch[row + chunk_rows, col:col + col_step] = predict(lstm, s2_cube_torch[chunk_rows])
+                    data_for_prediction_loader = Data.DataLoader(chunk_rows, batch_size=1, shuffle=True, num_workers=1,
+                                                                 drop_last=False)
+                    output_torch[row + chunk_rows, col:col + col_step] = predict(trained_model, data_for_prediction_loader)
 
             logging.info(f"Processed chunk in {time() - start_chunked:.2f} seconds")
 
